@@ -1,0 +1,6 @@
+brainflow
+numpy
+mne
+scikit-learn
+joblib
+python-osc

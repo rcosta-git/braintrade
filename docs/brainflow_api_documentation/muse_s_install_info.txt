@@ -1,0 +1,43 @@
+
+Muse S
+https://live.staticflickr.com/65535/51249005962_026502fee0.jpg
+
+Muse Website
+
+On Linux systems you may need to install libdbus and we recommend to compile BrainFlow from the source code:
+
+sudo apt-get install libdbus-1-dev # for ubuntu
+sudo yum install dbus-devel # for centos
+python3 tools/build.py --ble # to compile
+
+To create such board you need to specify the following board ID and fields of BrainFlowInputParams object:
+
+    BoardIds.MUSE_S_BOARD
+
+    optional: mac_address, mac address of the device to connect
+
+    optional: serial_number, device name, can be printed on the Muse device or discoovered via mobile apps
+
+Initialization Example:
+
+params = BrainFlowInputParams()
+board = BoardShim(BoardIds.MUSE_S_BOARD, params)
+
+Supported platforms:
+
+    Windows 10.0.19041.0+
+
+    MacOS 10.15+, 12.0 to 12.2 have known issues while scanning, you need to update to 12.3+. On MacOS 12+ you may need to configure Bluetooth permissions for your appication
+
+    Linux, compilation from source code probably will be needed
+
+    Devices like Raspberry Pi
+
+Available BrainFlow Presets:
+
+    BrainFlowPresets.DEFAULT_PRESET, it contains EEG data, to enable 5th EEG channel use board.config_board("p50")
+
+    BrainFlowPresets.AUXILIARY_PRESET, it contains Gyro and Accel data, enabled by default
+
+    BrainFlowPresets.ANCILLARY_PRESET, it contains PPG data, to enable it use board.config_board("p61")
+
