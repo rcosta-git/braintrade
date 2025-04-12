@@ -1,8 +1,8 @@
-# Detailed Plan: Motor Imagery (Left vs. Right) - v3.1 (OSC/MNE Focus)
+# Detailed Plan: Motor Imagery (Left vs. Right) - v3.3 (OSC/MNE Focus - Dual Model, Proba Vis)
 
 **Based on:** `docs/motor_imagery_mne_plan.md` (v2.1)
 
-**Goal:** Attempt to train a classifier to distinguish imagined left vs. right hand movement using EEG data, leveraging **MNE-Python for offline analysis/training** and **OSC/Muse Direct for data acquisition** in both training and real-time classification.
+**Goal:** Attempt to train classifiers to distinguish imagined left vs. right hand movement using EEG data, leveraging **MNE-Python for offline analysis/training** and **OSC/Muse Direct for data acquisition**. This version trains and evaluates **both Band Power and CSP** feature-based models from the same session data. The real-time classifier uses probability estimates for visualization.
 
 **Disclaimer:** Reliably detecting motor imagery with consumer EEG like Muse S is challenging. Success is not guaranteed.
 
@@ -10,13 +10,13 @@
 
 ## Phase 1: Offline Training (`motor_imagery_trainer.py`)
 
-This script handles data acquisition via OSC and model training using MNE.
+This script handles data acquisition via OSC, trains both Band Power and CSP models using MNE and Scikit-learn, evaluates them using cross-validation, and saves separate artifacts for each.
 
 ```mermaid
 graph TD
-    subgraph Trainer Script (OSC/MNE)
+    subgraph Trainer Script (OSC/MNE - Dual Model Training)
         direction LR
-        A[Start Trainer] --> B(Parse CLI Args);
+        A[Start Trainer] --> B(Parse CLI Args - Incl. cv-folds);
         B --> C[Start OSC Server Thread];
         C --> D{Run Acquisition Paradigm};
         D -- For Each Trial --> E[Display Cue];
@@ -27,22 +27,33 @@ graph TD
         D -- Loop End --> I[Consolidate Data];
         I --> J(Create MNE EpochsArray);
         J --> K(Preprocess Data - Filter Epochs - MNE);
-        K --> L{Feature Method?};
-        L -- Bandpower --> L1(Extract Log Band Power - MNE);
-        L -- CSP --> L2(Fit & Apply CSP - MNE);
-        L1 --> M(Select Features/Channels);
-        L2 --> M;
-        M --> N(Train Classifier - Sklearn);
-        N --> O(Evaluate Classifier);
-        O --> P[Save Training Artifacts];
-        P --> Q[Shutdown OSC Server];
+
+        subgraph Band Power Path
+            K --> L1(Extract Log Band Power - MNE);
+            L1 --> M1(Define BP Pipeline);
+            M1 --> N1(Evaluate BP Pipeline - CV);
+            N1 --> O1(Retrain BP Pipeline - Full Data);
+            O1 --> P1[Save BP Artifacts (incl. CV scores)];
+        end
+
+        subgraph CSP Path
+            K --> L2(Fit & Apply CSP - MNE);
+            L2 --> L2_Vis(Visualize CSP Patterns);
+            L2_Vis --> M2(Define CSP Pipeline);
+            M2 --> N2(Evaluate CSP Pipeline - CV);
+            N2 --> O2(Retrain CSP Pipeline - Full Data);
+            O2 --> P2[Save CSP Artifacts (incl. CV scores)];
+        end
+
+        P1 --> Q[Shutdown OSC Server];
+        P2 --> Q;
         Q --> R[End Trainer];
     end
 ```
 
 **Detailed Steps for `motor_imagery_trainer.py`:**
 
-1.  **Dependencies:** Ensure `python-osc`, `numpy`, `mne`, `scikit-learn`, `joblib` are in `requirements.txt`.
+1.  **Dependencies:** Ensure `python-osc`, `numpy`, `mne`, `scikit-learn`, `joblib`, `matplotlib` are in `requirements.txt`. (Consider setting matplotlib backend to 'Agg' for non-interactive saving).
 2.  **CLI Arguments (`argparse`):**
     *   `--osc-ip` (str, default: "0.0.0.0")
     *   `--osc-port` (int, default: 5001)
@@ -55,10 +66,10 @@ graph TD
     *   `--sampling-rate` (float, required) - Crucial for OSC data interpretation.
     *   `--filter-low` (float, default: 8.0)
     *   `--filter-high` (float, default: 30.0)
-    *   `--tmin` (float, default: 0.5) - *Note: In OSC approach, this defines epoch extraction *relative to the start of the collected segment*, not an external marker.*
-    *   `--tmax` (float, default: 3.5) - *Note: In OSC approach, this defines epoch extraction *relative to the start of the collected segment*.*
-    *   `--feature-method` (str, choices=['bandpower', 'csp'], default='bandpower')
+    *   `--tmin` (float, default: 0.5) - *Note: In OSC approach, defines epoch extraction *relative to the start of the collected segment*.*
+    *   `--tmax` (float, default: 3.5) - *Note: In OSC approach, defines epoch extraction *relative to the start of the collected segment*.*
     *   `--csp-components` (int, default: 4)
+    *   `--cv-folds` (int, default: 5) - Number of folds for cross-validation evaluation.
 3.  **OSC Setup:**
     *   Define global data structures (deques for EEG/horseshoe, lock, `data_collection_active` flag).
     *   Implement OSC handlers (`handle_eeg`, `handle_horseshoe`, `handle_default`).
@@ -69,50 +80,65 @@ graph TD
     *   Create and shuffle trial labels.
     *   Loop through trials:
         *   Display cues ("Get Ready", "Cue: Left/Right. Imagine...", "Rest...").
-        *   Use `time.sleep` for timing (`cue_duration`, `imagery_duration`, `rest_duration`).
-        *   Use `data_collection_active` flag and `data_lock` to control when `handle_eeg` stores data into buffers (only during `imagery_duration`).
-        *   After `imagery_duration`, retrieve the collected segment from buffers, store it with its label.
+        *   Use `time.sleep` for timing.
+        *   Use `data_collection_active` flag and `data_lock` to control data buffering during `imagery_duration`.
+        *   After `imagery_duration`, retrieve the collected segment, store it with its label.
         *   Check and print headband status warnings.
 5.  **Data Consolidation & MNE Epochs:**
     *   Check if any segments were collected.
-    *   Determine minimum segment length across all collected trials.
-    *   Create `epochs_data_np` by stacking segments (trimmed to min length). Shape `(n_epochs, n_channels, n_times)`.
-    *   Create `mne.Info` (using generic or known channel names, `--sampling-rate`).
-    *   Create `events_np` array (sample number is index * min_segment_len, event ID is the stored label).
+    *   Determine minimum segment length.
+    *   Create `epochs_data_np` by stacking segments.
+    *   Create `mne.Info`.
+    *   Create `events_np` array.
     *   Define `event_id = {'Left': LEFT_MARKER, 'Right': RIGHT_MARKER}`.
     *   Create `epochs = mne.EpochsArray(...)`.
 6.  **Preprocess Data (MNE):**
     *   Apply bandpass filter *to the epochs object*: `epochs.filter(...)`. Record `filter_phase`.
-    *   *(Optional)* ICA would also be applied to the `epochs` object.
 7.  **Extract Features (MNE):**
     *   Get filtered data: `epochs_data_filtered = epochs.get_data()`.
-    *   **If `args.feature_method == 'bandpower'`:**
-        *   Call `extract_band_power_features(epochs_data_filtered, ...)`. Let result be `X`.
-    *   **If `args.feature_method == 'csp'`:**
-        *   Initialize `csp = mne.decoding.CSP(...)`.
-        *   Fit and transform: `X = csp.fit_transform(epochs_data_filtered, epochs.events[:, -1])`.
-8.  **Select Features/Channels (Analysis):**
-    *   *(Initial)* Use all channels/components. `selected_channel_indices = list(range(NUM_EEG_CHANNELS))`.
-9.  **Train Classifier (Scikit-learn):**
     *   Get labels: `y = epochs.events[:, -1]`.
-    *   Prepare feature matrix `X`.
-    *   Split data (handle small N): `train_test_split(X, y, ...)`.
-    *   Create pipeline: `pipe = Pipeline([('scaler', StandardScaler()), ('clf', LinearDiscriminantAnalysis())])`.
-    *   Fit pipeline: `pipe.fit(X_train, y_train)`.
-10. **Evaluate Classifier:**
-    *   Predict on test data (if available): `y_pred = pipe.predict(X_test)`.
-    *   Calculate and print accuracy score and classification report.
-11. **Save Training Artifacts:**
-    *   Create `artifacts` dictionary (see previous plan). Include `csp` object if used.
-    *   Save using `joblib.dump()`.
-12. **Shutdown:**
+    *   **Band Power Path:** Call `extract_band_power_features(epochs_data_filtered, ...)`. Result `X_bp`.
+    *   **CSP Path:**
+        *   Initialize `csp = mne.decoding.CSP(n_components=args.csp_components, reg=None, log=True, norm_trace=False)`.
+        *   Fit and transform: `X_csp = csp.fit_transform(epochs_data_filtered, y)`. Save the *fitted* `csp` object.
+        *   **Visualize CSP Patterns:**
+            *   `try:`
+                *   `fig = csp.plot_patterns(epochs.info, ch_type='eeg', show_names=True, units='Patterns (AU)', size=1.5)`
+                *   `csp_plot_filename = f"{args.output_dir}/{args.session_name}_csp_patterns.png"`
+                *   `fig.savefig(csp_plot_filename)`
+                *   `print(f"Saved CSP patterns plot to: {csp_plot_filename}")`
+                *   `plt.close(fig)` # Close figure to free memory
+            *   `except Exception as e:`
+                *   `print(f"Warning: Could not plot/save CSP patterns: {e}")`
+8.  **Define Classifier Pipelines:**
+    *   `pipe_bp = Pipeline([('scaler', StandardScaler()), ('clf', LinearDiscriminantAnalysis())])`.
+    *   `pipe_csp = Pipeline([('scaler', StandardScaler()), ('clf', LinearDiscriminantAnalysis())])`.
+9.  **Evaluate Classifiers using Cross-Validation:**
+    *   `n_splits = args.cv_folds`.
+    *   `scoring_metrics = ['accuracy', 'f1', 'roc_auc']`.
+    *   **Evaluate Band Power:**
+        *   `cv_results_bp = cross_validate(pipe_bp, X_bp, y, cv=n_splits, scoring=scoring_metrics)`
+        *   Print mean/std for accuracy, f1, roc_auc from `cv_results_bp`.
+    *   **Evaluate CSP:**
+        *   `cv_results_csp = cross_validate(pipe_csp, X_csp, y, cv=n_splits, scoring=scoring_metrics)`
+        *   Print mean/std for accuracy, f1, roc_auc from `cv_results_csp`.
+10. **Retrain and Save Training Artifacts:**
+    *   **Retrain Final Models:** `pipe_bp.fit(X_bp, y)`, `pipe_csp.fit(X_csp, y)`.
+    *   **Save Band Power Artifacts:**
+        *   Create `artifacts_bp` dictionary including: retrained `pipe_bp`, parameters (`sampling_rate`, `filter_params`, `tmin`, `tmax`, `bands`, `ch_names`), `feature_method='bandpower'`, and mean/std CV scores (`cv_accuracy_mean`, `cv_accuracy_std`, `cv_f1_mean`, `cv_f1_std`, `cv_auc_mean`, `cv_auc_std`) from `cv_results_bp`.
+        *   Save to `f"{args.output_dir}/{args.session_name}_bandpower_model.joblib"`.
+    *   **Save CSP Artifacts:**
+        *   Create `artifacts_csp` dictionary including: retrained `pipe_csp`, the *fitted* `csp` object, parameters (`sampling_rate`, `filter_params`, `tmin`, `tmax`, `csp_components`, `ch_names`), `feature_method='csp'`, and mean/std CV scores from `cv_results_csp`.
+        *   Save to `f"{args.output_dir}/{args.session_name}_csp_model.joblib"`.
+    *   Print paths to both saved files.
+11. **Shutdown:**
     *   Use `try...except...finally` to ensure `osc_server_instance.shutdown()` is called.
 
 ---
 
 ## Phase 2: Real-time Classification (`motor_imagery_classifier.py`)
 
-This script loads the trained model and applies it to live OSC data.
+This script loads a trained model artifact and applies it to live OSC data, displaying predictions with a probability-based confidence bar.
 
 ```mermaid
 graph TD
@@ -129,8 +155,8 @@ graph TD
         H -- CSP --> H2(Apply CSP Transform - Loaded CSP Obj);
         H1 --> I(Scale Features);
         H2 --> I;
-        I --> J(Predict - Loaded Model);
-        J --> K[Display Prediction];
+        I --> J(Predict Proba - Loaded Model);
+        J --> K[Display Prediction & Confidence Bar];
         K --> E;
         E -- Ctrl+C --> L[Shutdown OSC Server];
         L --> M[End Classifier];
@@ -147,7 +173,7 @@ graph TD
     *   `--update-interval` (float, default: 0.5)
 3.  **Load Training Artifacts:**
     *   Load dictionary: `artifacts = joblib.load(args.model_file)`.
-    *   Extract all parameters (model pipeline, sampling_rate, filter params, feature_method, bands/csp object, tmin, tmax, etc.).
+    *   Extract all parameters (model pipeline, sampling_rate, filter params, feature_method, bands/csp object, tmin, tmax, etc.). *(Optionally print loaded CV scores)*
 4.  **OSC Setup:**
     *   Define global data structures (deques, lock).
     *   Implement OSC handlers (`handle_eeg`, `handle_horseshoe`).
@@ -155,6 +181,7 @@ graph TD
 5.  **Real-time Loop:**
     *   Calculate `window_duration = tmax - tmin`.
     *   Calculate `window_samples = int(window_duration * sampling_rate)`.
+    *   Define visualization parameters (e.g., `bar_width = 20`).
     *   Loop:
         *   `time.sleep(args.update_interval)`.
         *   Acquire lock, check buffer length, get latest `window_samples` into `window_data_np`. Check horseshoe. Release lock.
@@ -165,8 +192,18 @@ graph TD
             *   If `feature_method == 'bandpower'`: Call `extract_band_power_features`.
             *   If `feature_method == 'csp'`: Apply `loaded_csp.transform()`.
         *   **Scale Features:** `scaled_features = model.named_steps['scaler'].transform(features)`.
-        *   **Predict:** `prediction = model.named_steps['clf'].predict(scaled_features)[0]`.
-        *   **Display Prediction:** Convert marker to label and print. Print headband status warning if needed.
+        *   **Predict Probabilities:** `probabilities = model.named_steps['clf'].predict_proba(scaled_features)[0]` (Result: `[prob_left, prob_right]`).
+        *   **Determine Label & Confidence:**
+            *   `predicted_class_index = np.argmax(probabilities)`
+            *   `prediction_label = "Right" if predicted_class_index == 1 else "Left"` (Assuming class 1 is Right)
+            *   `right_probability = probabilities[1]`
+        *   **Create Visualization Bar:**
+            *   Calculate bar fills based on `right_probability` (0.0 to 1.0) and `bar_width`.
+            *   Construct `bar_str` (e.g., `[####|##########]`).
+        *   **Display Prediction & Bar:**
+            *   Print `prediction_label`.
+            *   Print `bar_str` and the numeric probability (e.g., `Confidence: [####|##########] (R: {right_probability:.2f})`).
+            *   Print headband status warning if needed.
 6.  **Shutdown:**
     *   Catch `KeyboardInterrupt`.
     *   In `finally`: `osc_server_instance.shutdown()`.
