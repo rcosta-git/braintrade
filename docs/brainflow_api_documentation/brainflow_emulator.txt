@@ -1,0 +1,6 @@
+
+BrainFlow Emulator
+
+BrainFlow Emulator allows you to run all integration tests for some of supported boards without real hardware. Our CI uses it for test automation. Also, you can run it on your own PC!
+
+Emulators are intended to test BrainFlow code for particular device. Also, some advanced emulators are capable to test very device specific features. BrainFlow users should use Synthetic board or Playback board for development.
