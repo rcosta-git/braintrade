@@ -9,7 +9,7 @@ from . import config
 from . import data_store
 from . import feature_extraction
 from . import state_logic
-
+from . import cv_handler
 def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
     """
     Main loop for processing sensor data, calculating features, updating state,
@@ -71,15 +71,17 @@ def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
                     ppg_data_array, config.PPG_SAMPLING_RATE
                 ) if ppg_data_array is not None else np.nan
 
-                # TODO: Calculate movement metric from recent_acc_data
-                current_movement = "N/A"
-                # TODO: Get expression from CV thread/process
-                current_expression = "N/A"
+                # Calculate movement metric from recent_acc_data
+                current_movement = feature_extraction.get_movement_metric(
+                    recent_acc_data
+                ) if recent_acc_data is not None else np.nan
+                # Get expression from CV thread/process
+                current_expression = cv_handler.get_current_expression()
 
                 # 5. Update stress state using persistence logic
                 current_official_state = state_logic.update_stress_state(
-                    current_ratio, current_hr, current_baseline_metrics,
-                    current_official_state, tentative_state_history
+                    current_ratio, current_hr, current_expression, current_movement,
+                    current_baseline_metrics, current_official_state, tentative_state_history
                 )
 
                 # Prepare data for UI
@@ -88,7 +90,7 @@ def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
                     "ratio": current_ratio,
                     "hr": current_hr,
                     "expression": current_expression, # Placeholder
-                    "movement": current_movement      # Placeholder
+                    "movement": current_movement
                 }
 
             # 6. Send data to the UI queue

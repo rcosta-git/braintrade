@@ -4,7 +4,7 @@ import collections # Needed for type hinting if used
 
 from . import config
 
-def update_stress_state(current_ratio, current_hr, baseline_metrics, current_state, tentative_state_history: collections.deque):
+def update_stress_state(current_ratio, current_hr,current_expression, current_movement, baseline_metrics, current_state, tentative_state_history: collections.deque):
     """
     Determines the tentative stress state based on current features and baseline metrics,
     and applies persistence logic to update the official current_state.
@@ -12,6 +12,8 @@ def update_stress_state(current_ratio, current_hr, baseline_metrics, current_sta
     Args:
         current_ratio (float): The latest calculated Alpha/Beta ratio.
         current_hr (float): The latest calculated Heart Rate (BPM).
+        current_expression (str): The latest detected facial expression.
+        current_movement (float): The latest calculated movement metric.
         baseline_metrics (dict): Dictionary containing 'ratio_median', 'ratio_std',
                                  'hr_median', 'hr_std'.
         current_state (str): The current official state before this update.
@@ -24,7 +26,7 @@ def update_stress_state(current_ratio, current_hr, baseline_metrics, current_sta
     new_state = current_state # Default to current state unless persistence logic changes it
 
     # 1. Determine Tentative State
-    if np.isnan(current_ratio) or np.isnan(current_hr):
+    if np.isnan(current_ratio) or np.isnan(current_hr) or current_expression == "N/A" or np.isnan(current_movement):
         # logging.warning("Cannot determine state due to NaN feature value.") # Logged by caller
         tentative_state = "Uncertain (NaN)"
     elif not baseline_metrics or 'ratio_median' not in baseline_metrics or 'hr_median' not in baseline_metrics:
@@ -34,19 +36,25 @@ def update_stress_state(current_ratio, current_hr, baseline_metrics, current_sta
         # Use thresholds from config
         ratio_lower_bound = baseline_metrics['ratio_median'] - config.RATIO_THRESHOLD * baseline_metrics['ratio_std']
         hr_upper_bound = baseline_metrics['hr_median'] + config.HR_THRESHOLD * baseline_metrics['hr_std']
+        movement_upper_bound = baseline_metrics['movement_median'] + config.MOVEMENT_THRESHOLD * baseline_metrics['movement_std']
 
-        is_ratio_low = current_ratio < ratio_lower_bound
-        is_hr_high = current_hr > hr_upper_bound
+        is_ratio_low = current_ratio < ratio_lower_bound if not np.isnan(current_ratio) else False
+        is_hr_high = current_hr > hr_upper_bound if not np.isnan(current_hr) else False
+        is_movement_high = current_movement > movement_upper_bound  if not np.isnan(current_movement) else False
+        is_expression_negative = current_expression in ["Angry", "Sad", "Fear"]
+        is_expression_neutral = current_expression == "Neutral"
+        is_physio_calm = not is_ratio_low and not is_hr_high
+        is_movement_low = current_movement < movement_upper_bound if not np.isnan(current_movement) else False
 
-        # --- Phase 1 Logic ---
-        # TODO: Incorporate ACC and CV data here based on Phase 2 plan
-        if is_ratio_low and is_hr_high:
-            tentative_state = "Stress"
-        elif is_ratio_low or is_hr_high:
-            tentative_state = "Warning"
+        # --- Phase 2 Logic ---
+        if (is_ratio_low and is_hr_high) or (is_expression_negative and (is_hr_high or is_movement_high)):
+            tentative_state = "Stress/Tilted"
+        elif is_physio_calm and is_movement_low and is_expression_neutral:
+            tentative_state = "Calm/Focused"
         else:
-            tentative_state = "Calm"
-        # --- End Phase 1 Logic ---
+            tentative_state = "Other/Uncertain"
+        # --- End Phase 2 Logic ---
+
 
     # 2. Apply Persistence Logic
     tentative_state_history.append(tentative_state) # Add current tentative state
@@ -74,7 +82,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # Dummy baseline
-    baseline = {'ratio_median': 1.5, 'ratio_std': 0.2, 'hr_median': 65, 'hr_std': 5}
+    baseline = {'ratio_median': 1.5, 'ratio_std': 0.2, 'hr_median': 65, 'hr_std': 5, 'movement_median': 1.0, 'movement_std': 0.1}
     # Dummy history deque (caller manages this)
     history = collections.deque(maxlen=config.STATE_PERSISTENCE_UPDATES)
     state = "Initializing"
@@ -83,20 +91,20 @@ if __name__ == '__main__':
 
     # Simulate updates
     inputs = [
-        (1.6, 66), # Calm
-        (1.7, 64), # Calm
-        (1.55, 67), # Calm
-        (1.0, 80), # Stress
-        (0.9, 82), # Stress
-        (1.1, 78), # Stress -> Should trigger change
-        (1.2, 75), # Warning
-        (1.6, 65), # Calm
-        (1.7, 63), # Calm
-        (1.5, 66), # Calm
-        (1.6, 64), # Calm
-        (1.55, 65), # Calm -> Should trigger change
+        (1.6, 66, "Neutral", 0.5), # Calm
+        (1.7, 64, "Neutral", 0.6), # Calm
+        (1.55, 67, "Neutral", 0.4), # Calm
+        (1.0, 80, "Angry", 1.5), # Stress
+        (0.9, 82, "Angry", 1.6), # Stress
+        (1.1, 78, "Angry", 1.4), # Stress -> Should trigger change
+        (1.2, 75, "Warning", 1.2), # Warning
+        (1.6, 65, "Neutral", 0.5), # Calm
+        (1.7, 63, "Neutral", 0.6), # Calm
+        (1.5, 66, "Neutral", 0.4), # Calm
+        (1.6, 64, "Neutral", 0.5), # Calm
+        (1.55, 65, "Neutral", 0.6), # Calm -> Should trigger change
     ]
 
-    for ratio, hr in inputs:
-        state = update_stress_state(ratio, hr, baseline, state, history)
-        print(f"Input (R:{ratio:.1f}, HR:{hr:.0f}) -> Tentative: {history[-1]:<15} | Official State: {state:<15} | History: {list(history)}")
+    for ratio, hr, expression, movement in inputs:
+        state = update_stress_state(ratio, hr, expression, movement, baseline, state, history)
+        print(f"Input (R:{ratio:.1f}, HR:{hr:.0f}, E:{expression}, M:{movement:.1f}) -> Tentative: {history[-1]:<15} | Official State: {state:<15} | History: {list(history)}")

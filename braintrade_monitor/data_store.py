@@ -29,7 +29,7 @@ def initialize_data_store(eeg_buffer_size, ppg_buffer_size, acc_buffer_size, num
         _eeg_data_buffers = [collections.deque(maxlen=eeg_buffer_size) for _ in range(_num_eeg_channels)]
         _ppg_data_buffer = collections.deque(maxlen=ppg_buffer_size)
         _acc_data_buffer = collections.deque(maxlen=acc_buffer_size)
-        _baseline_metrics.clear()
+        _baseline_metrics = {}
         _last_eeg_timestamp = 0
         _last_ppg_timestamp = 0
         _last_acc_timestamp = 0
@@ -175,7 +175,7 @@ def get_baseline_metrics():
 def check_buffers_initialized():
     """Checks if data buffers have been initialized."""
     with _data_lock:
-        return _eeg_data_buffers is not None and _ppg_data_buffer is not None # Add ACC check if needed
+        return _eeg_data_buffers is not None and _ppg_data_buffer is not None and _acc_data_buffer is not None
 
 # --- Timestamp Getters ---
 def get_last_timestamps():

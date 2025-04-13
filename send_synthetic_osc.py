@@ -28,17 +28,19 @@ def generate_ppg(sampling_rate, avg_hr=60):
     sensor_id = random.randint(1, 3)  # Simulate a sensor ID
     return [sensor_id, ppg_signal.mean(), sensor_id]  # Return sensor_id, value, sensor_id
 
+    return [x.mean(), y.mean(), z.mean()]
+
 def generate_acc(sampling_rate):
     """Generates synthetic accelerometer data (random noise around a baseline)."""
-    x = np.random.normal(0, 0.5, size=sampling_rate)  # Noise around 0
-    y = np.random.normal(0, 0.5, size=sampling_rate)  # Noise around 0
-    z = np.random.normal(9.8, 0.5, size=sampling_rate)  # Noise around gravity (9.8 m/s^2)
+    x = np.random.normal(0, 0.5)  # Noise around 0
+    y = np.random.normal(0, 0.5)  # Noise around 0
+    z = np.random.normal(9.8, 0.5)  # Noise around gravity (9.8 m/s^2)
     # Simulate occasional movement
     if random.random() < 0.1:
         x += random.uniform(-2, 2)
         y += random.uniform(-2, 2)
         z += random.uniform(-2, 2)
-    return [x.mean(), y.mean(), z.mean()]
+    return [x, y, z]
 
 def main():
     parser = argparse.ArgumentParser(description="Send synthetic OSC data for BrainTrade stress monitor.")

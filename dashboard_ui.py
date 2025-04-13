@@ -16,7 +16,7 @@ class DashboardUI:
         self.state_label = tk.Label(root, text="State: Unknown")
         self.state_label.pack()
 
-        self.expression_label = tk.Label(root, text="Expression: Unknown")
+        self.expression_label = tk.Label(root, text="Expression: N/A")
         self.expression_label.pack()
 
         self.movement_label = tk.Label(root, text="Movement: Unknown")
@@ -79,14 +79,14 @@ def start_ui(update_queue: queue.Queue):
 
     # Start the first check
     logger.info("UI: Starting queue check loop.") # Use logger instance
-    logging.info("UI: Starting queue check loop.")
+    # logging.info("UI: Starting queue check loop.")
     check_queue()
 
     # Start the Tkinter main event loop (this blocks until the window is closed)
     logger.info("UI: Starting mainloop.") # Use logger instance
     root.mainloop()
-    logger.info("UI: Mainloop finished.") # Use logger instance
-    logging.info("UI: Mainloop finished.")
+    logger.info("UI: Mainloop finished.")
+    # logging.info("UI: Mainloop finished.")
 
 
 if __name__ == '__main__':

@@ -32,7 +32,7 @@ STATE_PERSISTENCE_UPDATES = 6 # Number of consecutive updates for state change
 STALE_DATA_THRESHOLD = 5.0 # Max age for data to be considered fresh (seconds)
 RATIO_THRESHOLD = 1.5      # SD multiplier for ratio threshold
 HR_THRESHOLD = 1.5         # SD multiplier for HR threshold
-
+MOVEMENT_THRESHOLD = 1.5   # SD multiplier for movement threshold
 # General
 NUM_EEG_CHANNELS = 4
 EPSILON = 1e-10            # Small number to avoid division by zero

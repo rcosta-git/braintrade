@@ -12,7 +12,8 @@ from braintrade_monitor import (
     data_store,
     osc_handler,
     baseline,
-    processing
+    processing,
+    cv_handler
 )
 # Import the UI module (assuming it's at the top level for now)
 import dashboard_ui
@@ -31,6 +32,7 @@ def main():
     parser.add_argument('--baseline-duration', type=int, default=config.BASELINE_DURATION,
                         help='Duration of baseline calculation (seconds)')
     # Add other arguments if needed to override config values (e.g., thresholds)
+    parser.add_argument('--acc-buffer-size', type=int, default=500, help='Size of the accelerometer data buffer')
     # parser.add_argument('--ratio-threshold', type=float, default=config.RATIO_THRESHOLD, ...)
 
     args = parser.parse_args()
@@ -41,11 +43,11 @@ def main():
     buffer_safety_margin = 15 # seconds
     eeg_buffer_size = int(config.EEG_SAMPLING_RATE * (args.baseline_duration + buffer_safety_margin))
     ppg_buffer_size = int(config.PPG_SAMPLING_RATE * (args.baseline_duration + buffer_safety_margin))
-    acc_buffer_size = int(50 * (args.baseline_duration + buffer_safety_margin)) # Assuming 50Hz for ACC buffer size
+    # acc_buffer_size = int(50 * (args.baseline_duration + buffer_safety_margin)) # Assuming 50Hz for ACC buffer size
     data_store.initialize_data_store(
         eeg_buffer_size=eeg_buffer_size,
         ppg_buffer_size=ppg_buffer_size,
-        acc_buffer_size=acc_buffer_size,
+        acc_buffer_size=args.acc_buffer_size,
         num_eeg_channels=config.NUM_EEG_CHANNELS
     )
 
@@ -60,14 +62,18 @@ def main():
         sys.exit(1) # Exit if server fails
 
     # 6. Calculate Baseline
-    logging.info("Starting baseline calculation...")
+    logging.info("Starting baseline calculation with ACC...")
     if not baseline.calculate_baseline(args.baseline_duration):
         logging.error("Baseline calculation failed. Exiting.")
         osc_server_instance.shutdown() # Attempt clean shutdown
         sys.exit(1) # Exit if baseline fails
     logging.info("Baseline calculation successful.")
 
-    # 7. Start Processing Thread
+    # 7. Start Computer Vision Thread
+    logging.info("Starting computer vision processing...")
+    cv_handler.start_cv_processing()
+
+    # 9. Start Processing Thread
     logging.info("Starting data processing thread...")
     stop_processing_event = threading.Event()
     processing_thread = threading.Thread(

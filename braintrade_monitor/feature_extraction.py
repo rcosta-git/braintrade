@@ -75,6 +75,23 @@ def estimate_bpm_from_ppg(ppg_signal, sampling_rate):
     bpm = 60.0 / mean_ibi
     return bpm
 
+def get_movement_metric(acc_data):
+    """Calculates a movement metric from ACC data."""
+    if acc_data is None or len(acc_data) == 0:
+        return np.nan
+
+    acc_array = np.array(acc_data)
+    if acc_array.ndim != 2 or acc_array.shape[1] != 3:
+        logging.error(f"Invalid ACC data format: Expected (n_samples, 3), got {acc_array.shape}")
+        return np.nan
+
+    sd_x = np.std(acc_array[:, 0])
+    sd_y = np.std(acc_array[:, 1])
+    sd_z = np.std(acc_array[:, 2])
+
+    movement_metric = np.sqrt(sd_x**2 + sd_y**2 + sd_z**2)
+    return movement_metric
+
 def extract_alpha_beta_ratio(eeg_data, sampling_rate):
     """Calculates Alpha/Beta ratio from EEG data."""
     if eeg_data is None:

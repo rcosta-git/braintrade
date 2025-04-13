@@ -32,7 +32,7 @@ def calculate_baseline(duration_seconds):
     logging.info("Baseline data collection finished. Processing data...")
 
     # Retrieve all collected data from the data store
-    eeg_baseline_data, ppg_baseline_data, _ = data_store.get_all_data_for_baseline()
+    eeg_baseline_data, ppg_baseline_data, acc_baseline_data = data_store.get_all_data_for_baseline()
     # We ignore acc_baseline_data for now
 
     # --- Data Validation ---
@@ -46,6 +46,10 @@ def calculate_baseline(duration_seconds):
     if len(ppg_baseline_data) < min_ppg_samples:
         logging.error(f"Error: Insufficient PPG data collected for baseline. "
                       f"Required: {min_ppg_samples}, Collected: {len(ppg_baseline_data)}")
+        return False
+    
+    if len(acc_baseline_data) < 1:
+        logging.error(f"Error: Insufficient ACC data collected for baseline.")
         return False
 
     logging.info(f"Processing baseline data. EEG shape: {eeg_baseline_data.shape}, PPG length: {len(ppg_baseline_data)}")
@@ -86,7 +90,9 @@ def calculate_baseline(duration_seconds):
         'ratio_median': np.median(ratios),
         'ratio_std': np.std(ratios),
         'hr_median': np.median(hrs),
-        'hr_std': np.std(hrs)
+        'hr_std': np.std(hrs),
+        'movement_median': np.nan, # Placeholder
+        'movement_std': np.nan # Placeholder
     }
 
     data_store.set_baseline_metrics(calculated_metrics)

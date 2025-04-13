@@ -1,6 +1,10 @@
 brainflow
-numpy
+numpy<2.0.0
 mne
 scikit-learn
 joblib
 python-osc
+opencv-python
+fer
+moviepy
+tensorflow>=1.24.0
