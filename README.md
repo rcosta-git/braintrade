@@ -2,7 +2,7 @@
 
 This project aims to build a system using a Muse S headset (and potentially other inputs like computer vision) to monitor the mental state of a day trader in real-time. The goal is to detect suboptimal states (e.g., stress, fatigue, distraction) and provide feedback to help mitigate poor trading decisions.
 
-This project is being developed incrementally as part of a hackathon.
+This project is being developed incrementally.
 
 ## Approach
 
@@ -16,20 +16,20 @@ The system uses a multi-phase approach, starting with basic physiological indica
 
 See `docs/braintrade_monitor_plan.md` for the overall roadmap and individual `docs/phaseX_*.md` files for detailed plans.
 
-## Current Status (Web UI Integration In Progress)
+## Current Status (Web UI Integration Complete)
 
-Phase 2 is complete. Phase 3 (Focus/Fatigue) is partially implemented. The current focus is integrating a new web-based UI (React/TypeScript/Vite) located in the `web/` directory, replacing the previous Tkinter UI. A FastAPI backend (`web_server.py`) is being added to serve data from the `braintrade_monitor` package to the web frontend.
+Phase 2 is complete. Phase 3 (Focus/Fatigue) is partially implemented. A new web-based UI (React/TypeScript/Vite) located in the `web/` directory has been successfully integrated, replacing the previous Tkinter UI. A FastAPI backend (`web_server.py`) serves data from the `braintrade_monitor` package to the web frontend.
 
-*   **Modular Codebase:** Core logic refactored into the `braintrade_monitor` package for better organization and maintainability.
-*   **Unit Tests:** Unit tests added for `feature_extraction`, `state_logic`, `data_store`, and `baseline` modules. The team is currently working on getting the unit tests to pass.
-*   **Resolved Hanging Issue:** The issue causing the script to hang during baseline calculation has been resolved.
-*   **Console Logging:** Logging is configured to output to both file and console, with configurable levels.
-*   **OSC Data Reception:** Confirmed reception of EEG (`/eeg`), PPG (`/ppg`), and ACC (`/acc`) data from Muse Direct via OSC.
-*   **Core Logic ( `braintrade_monitor` package):** Implements OSC data handling, baseline calculation, feature extraction, state logic, and computer vision handling.
-*   **Web UI (`web/`):** A React/TypeScript/Vite frontend providing a dashboard display (integration in progress).
-*   **API Server (`web_server.py`):** A FastAPI server to bridge the Python backend and the web frontend (integration in progress).
-*   **Old UI (`dashboard_ui.py`):** Basic `tkinter` UI (being replaced).
-*   **Accelerometer Integration:** Successfully integrated accelerometer data for movement detection.
+Key accomplishments:
+*   Successfully integrated a React/TypeScript web UI.
+*   Implemented a FastAPI backend to serve data to the web UI.
+*   Implemented a heuristic trade suggestion with confidence level.
+*   Added live BTC price display.
+*   Improved handling of BCI connection status and data availability.
+
+Ongoing:
+*   Troubleshooting occasional issues with data flow and UI updates.
+
 ## Setup
 
 1.  **Hardware:**
@@ -78,7 +78,7 @@ Phase 2 is complete. Phase 3 (Focus/Fatigue) is partially implemented. The curre
 
 ### 2. Run the Backend Monitor (`main.py`)
 
-*   This script runs the core data processing and state logic.
+*   This script runs the core data processing and state logic, and now also hosts the API server.
 *   Start streaming from Muse Direct.
 *   In your first terminal (project root), run the monitor script:
     ```bash
@@ -87,19 +87,10 @@ Phase 2 is complete. Phase 3 (Focus/Fatigue) is partially implemented. The curre
 *   The script will first run the baseline calculation (default 60s). Please relax during this time.
 *   After baseline calculation, it will enter the real-time monitoring loop. It no longer displays its own UI window directly. Press Ctrl+C to stop.
 
-### 3. Run the API Server (`web_server.py`)
-
-*   This server provides the data from the backend monitor to the web UI.
-*   In a second terminal (project root), run the API server using Uvicorn:
-    ```bash
-    uvicorn web_server:app --reload --port 8000
-    ```
-*   Keep this terminal running.
-
-### 4. Run the Web UI Frontend
+### 3. Run the Web UI Frontend
 
 *   This serves the web application dashboard.
-*   In a third terminal, navigate to the `web/` directory and start the development server:
+*   In a second terminal, navigate to the `web/` directory and start the development server:
     ```bash
     cd web
     npm run dev  # or yarn dev, or bun run dev
@@ -107,7 +98,7 @@ Phase 2 is complete. Phase 3 (Focus/Fatigue) is partially implemented. The curre
 *   Open your web browser and navigate to the address shown (usually `http://localhost:5173`).
 *   You should see the dashboard updating with data from the backend.
 
-### 5. Run Monitor with Shorter Baseline (for testing)
+### 4. Run Monitor with Shorter Baseline (for testing)
 
 *   To speed up testing the backend, you can use a shorter baseline duration when running `main.py`:
     ```bash
@@ -115,14 +106,14 @@ Phase 2 is complete. Phase 3 (Focus/Fatigue) is partially implemented. The curre
     python3 main.py --baseline-duration 10
     ```
 
-### 6. PPG BPM Test (`test_ppg_bpm.py`)
+### 5. PPG BPM Test (`test_ppg_bpm.py`)
 
 *   A utility script to test the PPG-to-BPM estimation logic using simulated data.
     ```bash
     python3 test_ppg_bpm.py
     ```
 
-### 7. Run Unit Tests
+### 6. Run Unit Tests
 
 *   To run the Python unit tests, use the command from the project root:
     ```bash
@@ -169,15 +160,15 @@ CHANGELOG.md         # Changelog
 .gitignore           # Git ignore file
 ```
 
-
 ## Documentation
 
-*   `docs/braintrade_monitor_plan.md`: Overall project roadmap and Phase 2 plan/progress.
+*   `docs/braintrade_monitor_plan.md`: Overall project roadmap.
 *   `docs/phase1_stress_meter_plan.md`: Detailed plan for Phase 1.
 *   `docs/phase2_dashboard_plan.md`: Detailed plan for Phase 2.
 *   `docs/phase3_focus_guardian_plan.md`: Detailed plan for Phase 3.
 *   `docs/phase4_advanced_indicators_plan.md`: Detailed plan for Phase 4 (Stretch Goal).
 *   `docs/phase5_web_ui_plan.md`: Detailed plan for Phase 5 (Future Enhancement).
+*   `docs/web_ui_integration_plan.md`: Detailed plan for integrating the web UI, including troubleshooting steps.
 *   `docs/muse_s_osc_setup_guide.md`: Guide for setting up Muse Direct and OSC.
 
 (Note: Motor imagery related files have been moved to the `old/` directory).

@@ -4,7 +4,7 @@ import collections # Needed for type hinting if used
 
 from . import config
 
-def update_stress_state(current_ratio, current_hr, current_expression, current_movement, current_theta, baseline_metrics, current_state, tentative_state_history: collections.deque):
+def update_stress_state(current_ratio, current_hr, current_expression, current_movement, current_theta, baseline_metrics, current_state, tentative_state_history: collections.deque): # Removed market_trend argument
     """
     Determines the tentative stress state based on current features and baseline metrics,
     and applies persistence logic to update the official current_state.
@@ -12,7 +12,7 @@ def update_stress_state(current_ratio, current_hr, current_expression, current_m
     Args:
         current_ratio (float): The latest calculated Alpha/Beta ratio.
         current_hr (float): The latest calculated Heart Rate (BPM).
-        current_expression (str): The latest detected facial expression.
+        current_expression (dict): The latest detected facial expression probabilities.
         current_movement (float): The latest calculated movement metric.
         current_theta (float): The latest calculated Theta power.
         baseline_metrics (dict): Dictionary containing 'ratio_median', 'ratio_std', 'hr_median', 'hr_std', 'theta_median', 'theta_std'.
@@ -23,7 +23,9 @@ def update_stress_state(current_ratio, current_hr, current_expression, current_m
     Returns:
         str: The potentially updated current_state after applying persistence.
     """
-    logging.debug(f"update_stress_state: ratio={current_ratio}, hr={current_hr}, theta={current_theta}, movement={current_movement}, expression={current_expression}, baseline={baseline_metrics}")
+    logging.debug(f"--- state_logic START ---")
+    logging.debug(f"Inputs: ratio={current_ratio}, hr={current_hr}, theta={current_theta}, movement={current_movement}, expression_type={type(current_expression)}, current_state={current_state}")
+    logging.debug(f"Baseline Metrics Keys: {list(baseline_metrics.keys()) if baseline_metrics else 'None'}")
     new_state = current_state # Default to current state unless persistence logic changes it
 
     # 1. Determine Tentative State
@@ -52,13 +54,13 @@ def update_stress_state(current_ratio, current_hr, current_expression, current_m
 
         EXPRESSION_STRESS_THRESHOLD = 0.3 # Tune this
         is_expression_stressed = weighted_expression_score > EXPRESSION_STRESS_THRESHOLD
-        is_expression_neutral = current_expression == "Neutral"
+        # is_expression_neutral = current_expression == "Neutral" # Incorrect check, expression is a dict
         is_physio_calm = not is_ratio_low and not is_hr_high
         is_movement_low = current_movement < movement_upper_bound if not np.isnan(current_movement) else False
         theta_upper_bound = baseline_metrics['theta_median'] + config.THETA_THRESHOLD * baseline_metrics['theta_std']
         is_theta_high = current_theta > theta_upper_bound if not np.isnan(current_theta) else False
 
-        logging.debug(f"update_stress_state: is_ratio_low={is_ratio_low}, is_hr_high={is_hr_high}, is_movement_high={is_movement_high}, is_theta_high={is_theta_high}, expression={current_expression}")
+        # logging.debug(f"update_stress_state: is_ratio_low={is_ratio_low}, is_hr_high={is_hr_high}, is_movement_high={is_movement_high}, is_theta_high={is_theta_high}, expression={current_expression}") # Commented out
         # --- Phase 3 Logic ---
         # Order: Drowsy/Distracted -> Stress -> Warning -> Calm -> Other
         if is_theta_high and is_movement_low:
@@ -67,16 +69,18 @@ def update_stress_state(current_ratio, current_hr, current_expression, current_m
             tentative_state = "Stress/Tilted"
         elif is_ratio_low or is_hr_high: # Check for Warning state if not Stress
              tentative_state = "Warning"
-        elif is_physio_calm and is_movement_low and weighted_expression_score <= 0.0: # Relaxed Calm condition
+        elif is_physio_calm and is_movement_low and weighted_expression_score <= 0.1: # Relaxed Calm condition (allow slightly positive score)
             tentative_state = "Calm/Focused"
         else: # Default to Other/Uncertain if none of the above match
             tentative_state = "Other/Uncertain"
         # --- End Phase 3 Logic ---
         # --- End Phase 2 Logic ---
 
+        logging.debug(f"Calculated Tentative State: {tentative_state}")
 
     # 2. Apply Persistence Logic
     tentative_state_history.append(tentative_state) # Add current tentative state
+    logging.debug(f"History after append: {list(tentative_state_history)}")
 
     # Check if history is full (length equals persistence requirement)
     if len(tentative_state_history) == config.STATE_PERSISTENCE_UPDATES:
@@ -84,17 +88,42 @@ def update_stress_state(current_ratio, current_hr, current_expression, current_m
 
         # Check if all states in the history window are the same
         is_persistent = all(s == first_state_in_history for s in tentative_state_history)
+        logging.debug(f"Persistence Check: History full, First={first_state_in_history}, Persistent={is_persistent}")
 
         # Only update the official state if it's persistent AND different from the current state
         if is_persistent and new_state != first_state_in_history:
             logging.info(f"STATE CHANGE: {new_state} -> {first_state_in_history}")
             new_state = first_state_in_history # Update the official state
+            logging.debug(f"Persistence Met: Official state updated to {new_state}")
+        elif is_persistent:
+             logging.debug(f"Persistence Met BUT new state ({first_state_in_history}) matches current ({new_state}). No change.")
+        else:
+             logging.debug(f"Persistence NOT Met: Official state remains {new_state}")
+    else:
+        logging.debug(f"History not full ({len(tentative_state_history)}/{config.STATE_PERSISTENCE_UPDATES}). Official state remains {new_state}")
 
     # Note: The 'Uncertain (Stale Data)' state is typically set by the processing loop
     # *before* calling this function if data timestamps are too old.
     # Persistence for it could be handled here if needed, but usually not necessary.
+    # 3. Heuristic Trade Suggestion Logic
+    suggested_position = None
+    confidence_level = None
 
-    return new_state
+    # Retrieve market trend from the shared dictionary (passed as baseline_metrics)
+    market_trend = baseline_metrics.get("market_trend", "Flat") # Default to Flat if missing
+
+    if tentative_state == "Calm/Focused":
+        if market_trend == "Up":
+            suggested_position = "long"
+            confidence_level = "Medium"
+        elif market_trend == "Down":
+            suggested_position = "short"
+            confidence_level = "Medium"
+        # else: trend is Flat, leave suggestion as None
+
+    logging.debug(f"Returning: new_state={new_state}, suggestion={suggested_position}, confidence={confidence_level}")
+    logging.debug(f"--- state_logic END ---")
+    return new_state, suggested_position, confidence_level
 
 if __name__ == '__main__':
     # Example Usage / Test
@@ -125,5 +154,5 @@ if __name__ == '__main__':
     ]
 
     for ratio, hr, expression, movement in inputs:
-        state = update_stress_state(ratio, hr, expression, movement, 0.0, baseline, state, history)
-        print(f"Input (R:{ratio:.1f}, HR:{hr:.0f}, E:{expression}, M:{movement:.1f}) -> Tentative: {history[-1]:<15} | Official State: {state:<15} | History: {list(history)}")
+        state, suggestion, confidence = update_stress_state(ratio, hr, expression, movement, 0.0, baseline, state, history) # Removed "Flat" trend from call
+        print(f"Input (R:{ratio:.1f}, HR:{hr:.0f}, E:{expression}, M:{movement:.1f}) -> Tentative: {history[-1]:<15} | Official State: {state:<15} | Suggestion: {suggestion or 'None':<6} ({confidence or 'None'}) | History: {list(history)}")

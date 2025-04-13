@@ -15,31 +15,32 @@ def handle_eeg(address, *args):
     # logging.debug(f"OSC Handler: Received /eeg message with {len(args)} args.") # DEBUG LOG - Commented out for less verbosity
     # No need for global or lock here, data_store handles it
     # logging.debug(f"Received EEG: {args}") # Optional debug
-    logging.debug(f"handle_eeg: Received {len(args)} values. Attempting to add to data_store.")
+    # logging.debug(f"handle_eeg: Received {len(args)} values. Attempting to add to data_store.") # Commented out
     data_store.add_eeg_data(args)
 
 def handle_ppg(address, *args):
     """Handles incoming /ppg OSC messages."""
-    logging.debug("handle_ppg: Function called.") # Add log at function start
+    # logging.debug("handle_ppg: Function called.") # Commented out
     # logging.debug(f"Received PPG: {args}") # Optional debug
-    logging.debug(f"handle_ppg: Received {len(args)} values. Attempting to add to data_store.")
+    # logging.debug(f"handle_ppg: Received {len(args)} values. Attempting to add to data_store.") # Commented out
     data_store.add_ppg_data(args)
 
 def handle_acc(address, *args):
     """Handles incoming /acc OSC messages."""
     # logging.debug(f"Received ACC: {args}") # Optional debug
-    logging.debug(f"handle_acc: Received {len(args)} values. Attempting to add to data_store.")
+    # logging.debug(f"handle_acc: Received {len(args)} values. Attempting to add to data_store.") # Commented out
     data_store.add_acc_data(args)
 
 def handle_default(address, *args):
     """Handles any other incoming OSC messages."""
     # Explicitly check for /ppg here as a workaround
     if address == "/ppg":
-        logging.debug(f"handle_default: Routing {address} to handle_ppg.")
+        # logging.debug(f"handle_default: Routing {address} to handle_ppg.") # Commented out
         handle_ppg(address, *args) # Call the specific handler
     else:
         # Log other unexpected messages at DEBUG level
-        logging.debug(f"Received unhandled OSC message - Address: {address}, Arguments: {args}")
+        # logging.debug(f"Received unhandled OSC message - Address: {address}, Arguments: {args}") # Commented out
+        pass # Add pass to make the else block valid
 
 # --- OSC Server Setup ---
 

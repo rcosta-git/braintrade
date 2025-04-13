@@ -28,7 +28,7 @@ PPG_PEAK_MIN_DIST_FACTOR = 0.3 # Factor for min distance between peaks (relative
 PPG_PEAK_HEIGHT_FACTOR = 0.5 # Factor for min peak height (relative to std dev)
 
 # State Logic Parameters
-STATE_PERSISTENCE_UPDATES = 6 # Number of consecutive updates for state change
+STATE_PERSISTENCE_UPDATES = 1 # DEBUG: Temporarily set to 1 to bypass persistence check
 STALE_DATA_THRESHOLD = 5.0 # Max age for data to be considered fresh (seconds)
 RATIO_THRESHOLD = 1.5      # SD multiplier for ratio threshold
 HR_THRESHOLD = 1.5         # SD multiplier for HR threshold

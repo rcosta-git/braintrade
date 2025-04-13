@@ -29,22 +29,22 @@
     *   **Update `README.md`:** Add sections explaining how to install dependencies (`pip install -r requirements.txt`, `cd web && npm install`) and run both the backend (`python3 main.py`, `uvicorn web_server:app --reload`) and frontend (`cd web && npm run dev`).
     *   **Testing:** Verify the end-to-end flow: run the backend monitor, run the API server, run the frontend dev server, and check if the web UI updates with data reflecting the backend state.
 
-**Diagram:**
+**Troubleshooting:**
 
-```mermaid
-graph TD
-    subgraph Python Backend
-        A[main.py / processing.py] -- Updates --> B(Shared State Dict + Lock);
-        C[web_server.py (FastAPI)];
-        C -- Reads --> B;
-        C -- Serves --> D[/api/state Endpoint w/ Mapping];
-    end
+*   **CORS Error:** If the browser reports a CORS error, ensure that the `uvicorn` server is running and that the `origins` list in `main.py` includes the frontend's URL (e.g., `http://localhost:5173`). For debugging, you can temporarily set `allow_origins=["*"]` in `main.py`, but remember to revert this change for security reasons.
+    *   **Root Cause:** The CORS error was initially caused by a misconfiguration in the FastAPI app. Even though the CORS middleware was added, it wasn't correctly allowing requests from the frontend origin.
+    *   **Resolution:** Setting `allow_origins=["*"]` confirmed that the middleware itself was working. The issue was then resolved by ensuring the Uvicorn server was running within the same process as the FastAPI app and that the correct origins were specified.
+*   **No Data Received:** If the web UI shows default or static data, check the following:
+    *   Ensure the backend monitor (`main.py`) is running *before* starting the frontend.
+    *   Verify that the `/api/state` endpoint in `web_server.py` is accessible and returns JSON data when accessed directly in the browser.
+    *   Check the browser's developer console for any JavaScript errors or network requests that are failing.
+    *   Verify that the data mapping in `web_server.py` is correctly mapping the backend data to the frontend's `BiomarkerData` structure.
+*   **PPG Data Not Received:** If the PPG data is not being received, double-check that Muse Direct is streaming `/ppg` data and that the OSC server is running correctly.
+    *   **Root Cause:** The OSC dispatcher was not correctly routing messages with the address `/ppg` to the `handle_ppg` function.
+    *   **Workaround:** The issue was resolved by explicitly checking for the `/ppg` address within the `handle_default` function in `osc_handler.py` and calling `handle_ppg` from there. This bypasses the potentially problematic direct mapping.
 
-    subgraph Web Frontend (React/Vite @ web/)
-        E[BiomarkerContext.tsx] -- Polls (fetch) --> D;
-        E -- Updates --> F(React State);
-        F -- Renders --> G[UI Components];
-    end
+**Data Mapping:**
 
-    style Python Backend fill:#ccf,stroke:#333,stroke-width:2px
-    style Web Frontend fill:#cfc,stroke:#333,stroke-width:2px
+The following table describes the mapping between the backend data (in `shared_state`) and the frontend's `BiomarkerData` structure:
+
+| Backend Field        | Frontend Field   | Notes

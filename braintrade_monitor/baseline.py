@@ -98,7 +98,7 @@ def calculate_baseline(duration_seconds):
             movement = feature_extraction.get_movement_metric(acc_window)
             if not np.isnan(movement):
                 movements.append(movement)
-                logging.debug(f"Baseline movement sample {len(movements)}: {movement:.4f}") # Add debug log for each movement value
+                # logging.debug(f"Baseline movement sample {len(movements)}: {movement:.4f}") # Commented out
     else:
         logging.warning(f"Insufficient ACC data for baseline movement calculation. Collected: {len(acc_baseline_data)}, Required: {acc_window_samples}")
 

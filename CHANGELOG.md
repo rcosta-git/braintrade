@@ -26,6 +26,43 @@
 *   **Phase 3 In Progress:** Started implementing Phase 3, focusing on adding focus and fatigue detection using EEG Theta band analysis and EEG artifact detection for blink detection.
 
 ---
+## [Unreleased] - 2025-04-13 (Midday - UI Improvements & Troubleshooting)
+
+### Added
+*   Implemented heuristic trade suggestions with confidence levels.
+*   Integrated live BTC price display in the AssetChart.
+*   Improved handling of BCI connection status and data availability in the UI.
+
+### Fixed
+*   Addressed a `NameError` in `processing.py` by initializing variables.
+
+### Changed
+*   Reduced log verbosity by commenting out frequent `DEBUG` messages in `osc_handler.py`, `data_store.py`, and `processing.py`.
+
+### Known Issues
+*   The AssetChart still uses simulated data for the chart line itself, but displays the real BTC price.
+*   Further testing and refinement of the heuristic trade suggestion logic is needed.
+
+---
+## [Unreleased] - 2025-04-13 (Late Morning - Web UI Integration)
+
+### Added
+*   **Web UI Integration:** Integrated a React/TypeScript web UI, replacing the Tkinter UI.
+    *   Created `web_server.py` to serve data to the web UI via a FastAPI endpoint.
+    *   Modified `processing.py` to share state with the API server.
+    *   Modified `web/src/contexts/BiomarkerContext.tsx` to fetch data from the API.
+
+### Fixed
+*   **CORS Issue:** Resolved a CORS issue by configuring the FastAPI server to allow requests from the frontend origin.
+*   **PPG Data Flow:** Implemented a workaround in `osc_handler.py` to ensure PPG data is correctly received and processed.
+
+### Changed
+*   Updated `README.md` to reflect the new web UI and provide updated setup and running instructions.
+
+### Known Issues
+*   The unhandled OSC messages are still present and should be investigated.
+
+---
 ## [Unreleased] - 2025-04-12 (Late Evening - Phase 1 Completion & Debugging)
 :start_line:4
 :end_line:6
