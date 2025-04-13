@@ -82,8 +82,8 @@ def main():
         sys.exit(1) # Exit if server fails
 
     # Give OSC server a moment to start receiving data
-    logging.info("Waiting briefly for OSC data to start arriving...")
-    time.sleep(1.0) # Add a 1-second delay
+    # logging.info("Waiting briefly for OSC data to start arriving...")
+    # time.sleep(1.0) # REMOVED delay - suspecting issue here or in OSC thread startup
 
     # 6. Calculate Baseline
     logging.info("Starting baseline calculation...")
@@ -129,6 +129,7 @@ def main():
     app = FastAPI()
 
     # Configure CORS
+    logging.info("Applying CORS middleware...") # Add log before middleware
     origins = [
         "http://localhost:5173", # Default Vite port
         "http://127.0.0.1:5173",

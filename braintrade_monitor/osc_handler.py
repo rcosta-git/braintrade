@@ -20,6 +20,7 @@ def handle_eeg(address, *args):
 
 def handle_ppg(address, *args):
     """Handles incoming /ppg OSC messages."""
+    logging.debug("handle_ppg: Function called.") # Add log at function start
     # logging.debug(f"Received PPG: {args}") # Optional debug
     logging.debug(f"handle_ppg: Received {len(args)} values. Attempting to add to data_store.")
     data_store.add_ppg_data(args)
@@ -32,9 +33,13 @@ def handle_acc(address, *args):
 
 def handle_default(address, *args):
     """Handles any other incoming OSC messages."""
-    # Log unexpected messages at INFO level to ensure visibility
-    logging.info(f"Received unhandled OSC message - Address: {address}, Arguments: {args}")
-    # pass # No longer needed as logging performs an action
+    # Explicitly check for /ppg here as a workaround
+    if address == "/ppg":
+        logging.debug(f"handle_default: Routing {address} to handle_ppg.")
+        handle_ppg(address, *args) # Call the specific handler
+    else:
+        # Log other unexpected messages at DEBUG level
+        logging.debug(f"Received unhandled OSC message - Address: {address}, Arguments: {args}")
 
 # --- OSC Server Setup ---
 
@@ -66,7 +71,7 @@ def start_osc_server(ip="0.0.0.0", port=5001):
 
     # Map OSC addresses to handler functions
     disp.map("/eeg", handle_eeg)
-    disp.map("/ppg", handle_ppg)
+    # disp.map("/ppg", handle_ppg) # Comment out direct mapping, handled in default
     disp.map("/acc", handle_acc)
     # You can add more mappings here for other OSC messages if needed
     # e.g., disp.map("/muse/elements/jaw_clench", handle_jaw_clench)
