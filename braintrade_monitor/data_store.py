@@ -15,6 +15,8 @@ _baseline_metrics = {}
 _last_eeg_timestamp = 0
 _last_ppg_timestamp = 0
 _last_acc_timestamp = 0
+_suggested_position = None
+_confidence_level = None
 _num_eeg_channels = 4 # Default, can be overridden during init
 
 # --- Initialization ---
@@ -48,7 +50,7 @@ def add_eeg_data(eeg_sample):
                     _eeg_data_buffers[i].append((ts, float(eeg_sample[i])))
                 _last_eeg_timestamp = ts
                 # Log after successful addition inside try block
-                logging.debug(f"add_eeg_data: Added sample. Buffer sizes: {[len(b) for b in _eeg_data_buffers]}")
+                # logging.debug(f"add_eeg_data: Added sample. Buffer sizes: {[len(b) for b in _eeg_data_buffers]}") # Commented out
             except (ValueError, TypeError, IndexError) as e:
                  logging.error(f"Error processing EEG sample in data_store: {e} - Sample: {eeg_sample}")
         elif _eeg_data_buffers is None:
@@ -68,7 +70,7 @@ def add_ppg_data(ppg_sample):
                  _ppg_data_buffer.append((ts, ppg_value))
                  _last_ppg_timestamp = ts
                  # Log after successful addition inside try block
-                 logging.debug(f"add_ppg_data: Added sample. Buffer size: {len(_ppg_data_buffer)}")
+                 # logging.debug(f"add_ppg_data: Added sample. Buffer size: {len(_ppg_data_buffer)}") # Commented out
              except (ValueError, TypeError, IndexError) as e:
                  logging.error(f"Error processing PPG sample in data_store: {e} - Sample: {ppg_sample}")
         elif _ppg_data_buffer is None:
@@ -88,7 +90,7 @@ def add_acc_data(acc_sample):
                 _acc_data_buffer.append((ts, acc_tuple))
                 _last_acc_timestamp = ts
                 # Log after successful addition inside try block
-                logging.debug(f"add_acc_data: Added sample. Buffer size: {len(_acc_data_buffer)}")
+                # logging.debug(f"add_acc_data: Added sample. Buffer size: {len(_acc_data_buffer)}") # Commented out
             except (ValueError, TypeError) as e:
                 logging.error(f"Error processing ACC sample in data_store: {e} - Sample: {acc_sample}")
         elif _acc_data_buffer is None:
@@ -106,9 +108,9 @@ def get_data_for_processing(eeg_window_duration, ppg_window_duration, acc_window
     ppg_window_start_time = now - ppg_window_duration
     acc_window_start_time = now - acc_window_duration
 
-    logging.debug("get_data_for_processing: Attempting to acquire lock...")
+    # logging.debug("get_data_for_processing: Attempting to acquire lock...") # Commented out
     with _data_lock:
-        logging.debug("get_data_for_processing: Lock acquired.")
+        # logging.debug("get_data_for_processing: Lock acquired.") # Commented out
         # Make copies under the lock to minimize lock holding time
         time_since_last_eeg = now - _last_eeg_timestamp if _last_eeg_timestamp > 0 else float('inf')
         time_since_last_ppg = now - _last_ppg_timestamp if _last_ppg_timestamp > 0 else float('inf')
@@ -139,10 +141,10 @@ def get_data_for_processing(eeg_window_duration, ppg_window_duration, acc_window
 
         # Copy baseline metrics
         # Baseline metrics are no longer copied/returned here
-        logging.debug(f"get_data_for_processing: EEG bufs exist={_eeg_data_buffers is not None}, PPG buf exists={_ppg_data_buffer is not None}, ACC buf exists={_acc_data_buffer is not None}")
+        # logging.debug(f"get_data_for_processing: EEG bufs exist={_eeg_data_buffers is not None}, PPG buf exists={_ppg_data_buffer is not None}, ACC buf exists={_acc_data_buffer is not None}") # Commented out
 
     # Log lengths before returning
-    logging.debug(f"get_data_for_processing: Returning EEG len={len(recent_eeg_data[0]) if recent_eeg_data else 'None'}, PPG len={len(recent_ppg_data) if recent_ppg_data else 'None'}, ACC len={len(recent_acc_data) if recent_acc_data else 'None'}")
+    # logging.debug(f"get_data_for_processing: Returning EEG len={len(recent_eeg_data[0]) if recent_eeg_data else 'None'}, PPG len={len(recent_ppg_data) if recent_ppg_data else 'None'}, ACC len={len(recent_acc_data) if recent_acc_data else 'None'}") # Commented out
 
     # Return copies of data and timestamps
     return (time_since_last_eeg, time_since_last_ppg, time_since_last_acc,
@@ -168,12 +170,27 @@ def get_all_data_for_baseline():
              acc_baseline_data = np.array([item[1] for item in _acc_data_buffer])
         else:
              acc_baseline_data = np.array([])
-
+        _suggested_position = None
+        _confidence_level = None
     return eeg_baseline_data, ppg_baseline_data, acc_baseline_data
 
 
-# --- Baseline Metrics Functions ---
+# --- State/Suggestion Functions ---
 
+def set_suggestion_data(suggested_position, confidence_level):
+    """Sets the current suggested position and confidence level."""
+    global _suggested_position, _confidence_level
+    with _data_lock:
+        _suggested_position = suggested_position
+        _confidence_level = confidence_level
+        # logging.debug(f"Data Store: Suggestion updated: position={suggested_position}, confidence={confidence_level}") # Commented out
+
+def get_suggestion_data():
+    """Returns the current suggested position and confidence level."""
+    with _data_lock:
+        return _suggested_position, _confidence_level
+
+# --- Baseline Metrics Functions ---
 def set_baseline_metrics(metrics_dict):
     """Updates the stored baseline metrics."""
     with _data_lock:

@@ -4,7 +4,8 @@ import threading
 import time
 import logging
 import sys
-import uvicorn # For running the API server
+import multiprocessing
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,11 +19,41 @@ from braintrade_monitor import (
     processing,
     cv_handler
 )
-# Import the API endpoint function
+# Import the API endpoint function from web_server
 from web_server import get_state as api_get_state
+# REMOVED: shared_state_module import
 
 # REMOVED old UI import
 # import dashboard_ui
+
+# Function to run the API server in a separate process
+def run_api_server(shared_dict, shared_lock):
+    app = FastAPI()
+
+    # Configure CORS
+    origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8080", # Added from previous debugging
+    ]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Define the endpoint, using the passed managed dict/lock
+    @app.get("/api/state")
+    async def main_get_state():
+        # Pass the managed objects to the imported function
+        return await api_get_state(shared_dict, shared_lock)
+
+    # Run Uvicorn
+    # Note: log_level='info' might be noisy, consider 'warning'
+    uvicorn.run(app, host='0.0.0.0', port=8000, log_level='info')
+
 
 def main():
     # 1. Setup Logging
@@ -58,18 +89,24 @@ def main():
         num_eeg_channels=config.NUM_EEG_CHANNELS
     )
 
-    # 4. Initialize Shared State for Web Server
-    shared_state = {
-        "timestamp": None,
-        "system_phase": "Initializing", # Add system phase
+    # 4. Initialize Shared State using multiprocessing Manager
+    manager = multiprocessing.Manager()
+    shared_manager_dict = manager.dict({
+        "timestamp": time.time(),
+        "system_phase": "Initializing",
         "overall_state": "Initializing",
         "alpha_beta_ratio": None,
         "heart_rate": None,
         "expression_dict": None,
         "movement_metric": None,
         "theta_power": None,
-    }
-    shared_state_lock = threading.Lock()
+        "last_osc_timestamp": None,
+        "suggested_position": None,
+        "confidence_level": None,
+        "market_trend": None,
+    })
+    shared_manager_lock = manager.Lock()
+    logging.info("Multiprocessing managed state initialized.")
 
     # Initialize old UI Queue (might still be used by processing loop temporarily)
     update_queue = queue.Queue(maxsize=100)
@@ -85,12 +122,24 @@ def main():
     # logging.info("Waiting briefly for OSC data to start arriving...")
     # time.sleep(1.0) # REMOVED delay - suspecting issue here or in OSC thread startup
 
+    # 5.5 Start API Server Process using multiprocessing (Moved BEFORE baseline)
+    logging.info("Starting API server process...")
+    api_server_process = multiprocessing.Process(
+        target=run_api_server,
+        args=(shared_manager_dict, shared_manager_lock),
+        daemon=True, # Daemon process exits if main process exits
+        name="APIServerProcess"
+    )
+    api_server_process.start()
+    # Give API server a moment to initialize
+    time.sleep(2.0) # Add a small delay to ensure API server starts before baseline
+
     # 6. Calculate Baseline
     logging.info("Starting baseline calculation...")
     # Update shared state before baseline
-    with shared_state_lock:
-        shared_state["system_phase"] = "Calculating Baseline"
-        shared_state["timestamp"] = time.time()
+    with shared_manager_lock:
+        shared_manager_dict["system_phase"] = "Calculating Baseline"
+        shared_manager_dict["timestamp"] = time.time()
 
     if not baseline.calculate_baseline(args.baseline_duration):
         logging.error("Baseline calculation failed. Exiting.")
@@ -99,9 +148,9 @@ def main():
         sys.exit(1) # Exit if baseline fails
 
     # Update shared state after baseline
-    with shared_state_lock:
-        shared_state["system_phase"] = "Monitoring"
-        shared_state["timestamp"] = time.time()
+    with shared_manager_lock:
+        shared_manager_dict["system_phase"] = "Monitoring"
+        shared_manager_dict["timestamp"] = time.time()
     logging.info("Baseline calculation successful. Starting monitoring.")
 
     # 7. Start Computer Vision Thread
@@ -116,47 +165,15 @@ def main():
         args=(
             update_queue,
             stop_processing_event,
-            shared_state, # Pass shared state dict
-            shared_state_lock # Pass shared state lock
+            shared_manager_dict, # Pass managed dict
+            shared_manager_lock # Pass managed lock
         ),
         daemon=True, # Daemon thread exits if main thread exits
         name="ProcessingThread"
     )
     processing_thread.start()
 
-    # 8. Setup FastAPI App and API Endpoint
-    logging.info("Setting up FastAPI app...")
-    app = FastAPI()
-
-    # Configure CORS
-    logging.info("Applying CORS middleware...") # Add log before middleware
-    origins = [
-        "http://localhost:5173", # Default Vite port
-        "http://127.0.0.1:5173",
-    ]
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    # Define the endpoint, injecting shared state and lock
-    @app.get("/api/state")
-    async def main_get_state():
-        # This wrapper calls the imported function, passing the state/lock from main's scope
-        return await api_get_state(shared_state, shared_state_lock)
-
-    # 9. Start API Server Thread
-    logging.info("Starting API server thread...")
-    api_server_thread = threading.Thread(
-        target=uvicorn.run,
-        kwargs={'app': app, 'host': '0.0.0.0', 'port': 8000, 'log_level': 'info'},
-        daemon=True, # Daemon thread exits if main thread exits
-        name="APIServerThread"
-    )
-    api_server_thread.start()
+    # REMOVED: API Server start (moved before baseline)
 
     # 10. Keep Main Thread Alive & Handle Shutdown
     logging.info("Application started. Press Ctrl+C to stop.")
@@ -187,7 +204,14 @@ def main():
              if processing_thread.is_alive():
                   logging.warning("Processing thread did not exit cleanly.")
 
-        # API server thread is daemon, should exit automatically, but good practice might involve more graceful shutdown if needed
+        # Terminate API server process
+        logging.info("Terminating API server process...")
+        if api_server_process and api_server_process.is_alive():
+            api_server_process.terminate() # Send SIGTERM
+            api_server_process.join(timeout=2.0) # Wait briefly
+            if api_server_process.is_alive():
+                 logging.warning("API server process did not terminate cleanly.")
+                 # Consider api_server_process.kill() if needed
 
         logging.info("BrainTrade Monitor shutdown complete.")
         sys.exit(0)

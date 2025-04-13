@@ -4,7 +4,7 @@ import collections # Needed for type hinting if used
 
 from . import config
 
-def update_stress_state(current_ratio, current_hr, current_expression, current_movement, current_theta, baseline_metrics, current_state, tentative_state_history: collections.deque):
+def update_stress_state(current_ratio, current_hr, current_expression, current_movement, current_theta, market_trend, baseline_metrics, current_state, tentative_state_history: collections.deque):
     """
     Determines the tentative stress state based on current features and baseline metrics,
     and applies persistence logic to update the official current_state.
@@ -23,7 +23,7 @@ def update_stress_state(current_ratio, current_hr, current_expression, current_m
     Returns:
         str: The potentially updated current_state after applying persistence.
     """
-    logging.debug(f"update_stress_state: ratio={current_ratio}, hr={current_hr}, theta={current_theta}, movement={current_movement}, expression={current_expression}, baseline={baseline_metrics}")
+    # logging.debug(f"update_stress_state: ratio={current_ratio}, hr={current_hr}, theta={current_theta}, movement={current_movement}, expression={current_expression}, baseline={baseline_metrics}") # Commented out
     new_state = current_state # Default to current state unless persistence logic changes it
 
     # 1. Determine Tentative State
@@ -58,7 +58,7 @@ def update_stress_state(current_ratio, current_hr, current_expression, current_m
         theta_upper_bound = baseline_metrics['theta_median'] + config.THETA_THRESHOLD * baseline_metrics['theta_std']
         is_theta_high = current_theta > theta_upper_bound if not np.isnan(current_theta) else False
 
-        logging.debug(f"update_stress_state: is_ratio_low={is_ratio_low}, is_hr_high={is_hr_high}, is_movement_high={is_movement_high}, is_theta_high={is_theta_high}, expression={current_expression}")
+        # logging.debug(f"update_stress_state: is_ratio_low={is_ratio_low}, is_hr_high={is_hr_high}, is_movement_high={is_movement_high}, is_theta_high={is_theta_high}, expression={current_expression}") # Commented out
         # --- Phase 3 Logic ---
         # Order: Drowsy/Distracted -> Stress -> Warning -> Calm -> Other
         if is_theta_high and is_movement_low:
@@ -93,8 +93,20 @@ def update_stress_state(current_ratio, current_hr, current_expression, current_m
     # Note: The 'Uncertain (Stale Data)' state is typically set by the processing loop
     # *before* calling this function if data timestamps are too old.
     # Persistence for it could be handled here if needed, but usually not necessary.
+    # 3. Heuristic Trade Suggestion Logic
+    suggested_position = None
+    confidence_level = None
 
-    return new_state
+    if tentative_state == "Calm/Focused":
+        if market_trend == "Up":
+            suggested_position = "long"
+            confidence_level = "Medium"
+        elif market_trend == "Down":
+            suggested_position = "short"
+            confidence_level = "Medium"
+        # else: trend is Flat, leave suggestion as None
+
+    return new_state, suggested_position, confidence_level
 
 if __name__ == '__main__':
     # Example Usage / Test
@@ -125,5 +137,5 @@ if __name__ == '__main__':
     ]
 
     for ratio, hr, expression, movement in inputs:
-        state = update_stress_state(ratio, hr, expression, movement, 0.0, baseline, state, history)
-        print(f"Input (R:{ratio:.1f}, HR:{hr:.0f}, E:{expression}, M:{movement:.1f}) -> Tentative: {history[-1]:<15} | Official State: {state:<15} | History: {list(history)}")
+        state, suggestion, confidence = update_stress_state(ratio, hr, expression, movement, 0.0, "Flat", baseline, state, history)
+        print(f"Input (R:{ratio:.1f}, HR:{hr:.0f}, E:{expression}, M:{movement:.1f}) -> Tentative: {history[-1]:<15} | Official State: {state:<15} | Suggestion: {suggestion or 'None':<6} ({confidence or 'None'}) | History: {list(history)}")
