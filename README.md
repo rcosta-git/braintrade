@@ -16,7 +16,7 @@ The system uses a multi-phase approach, starting with basic physiological indica
 
 See `docs/braintrade_monitor_plan.md` for the overall roadmap and individual `docs/phaseX_*.md` files for detailed plans.
 
-## Current Status (Phase 1 Complete)
+## Current Status (Phase 2 In Progress)
 
 Phase 1 is now complete. The stress monitor script (`stress_monitor.py`) is functional and performs real-time stress monitoring based on EEG Alpha/Beta ratio and PPG-derived heart rate.
 

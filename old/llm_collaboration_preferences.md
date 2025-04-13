@@ -20,10 +20,33 @@
 
 4.  **Follow Plans:** Adhere to the detailed activity plans created during the planning phase.
 5.  **File Modifications:**
-    *   Use `apply_diff` for targeted changes to existing files. Ensure the `SEARCH` block exactly matches current file content (use `read_file` first if unsure).
+    *   Use `apply_diff` for targeted changes to existing files. See specific guidelines below.
     *   Use `write_to_file` for creating new files or for significant rewrites of existing files. Always provide the *complete* file content.
     *   Confirm file paths before writing or modifying.
     *   **Never** overwrite critical configuration files (e.g., `.env`, potentially `docker-compose.yml`) without explicit user confirmation via `ask_followup_question`.
+
+    ### Specific Guidelines for `apply_diff`
+    *   **Verify the `SEARCH` Block Rigorously:**
+        *   **Rule:** **Never assume content.** Always use `read_file` to fetch the *exact* lines intended for the `SEARCH` block immediately before constructing the `apply_diff` call. Pay extremely close attention to whitespace (leading/trailing spaces, tabs) and line endings.
+        *   **Rule:** Ensure the `:start_line:` and `:end_line:` numbers in the `SEARCH` block precisely match the lines fetched by `read_file`.
+    *   **Construct the `REPLACE` Block Carefully:**
+        *   **Rule:** **Match initial indentation:** The *first line* of the `REPLACE` block must have the *exact same indentation* as the *first line* of the `SEARCH` block, unless the explicit goal is to change the indentation level of that line itself.
+        *   **Rule:** **Maintain relative indentation:** All subsequent lines within the `REPLACE` block must maintain correct indentation *relative* to the first line of the `REPLACE` block, adhering strictly to the project's established style (e.g., 4 spaces, tabs).
+        *   **Rule:** **Handle Multi-line Replacements:** When the `REPLACE` block contains multiple lines, ensure every line after the first maintains correct indentation *relative to the first line of the REPLACE block* and adheres to the project's style. Double-check indentation for nested structures within the multi-line replacement.
+    *   **Anticipate Contextual Indentation Changes:**
+        *   **Rule:** If the `REPLACE` block introduces a new scope (like `if`, `for`, `class`, `def`, `try`, `{ ... }`), ensure all lines *within* that new scope in the `REPLACE` block are correctly indented relative to the line introducing the scope.
+        *   **Rule:** If the changes logically require lines *after* the `end_line` of the `SEARCH` block to be indented or un-indented (e.g., wrapping existing code in a new block, removing an enclosing block), these subsequent lines *must* be handled. This might require extending the `SEARCH` block, adding more `SEARCH/REPLACE` blocks in the same call, or using a subsequent call.
+        *   **Suggestion:** After applying a diff that alters code structure, consider a follow-up `read_file` on the modified section and its surroundings to visually confirm correct indentation.
+    *   **Identify and Respect Project Style:**
+        *   **Suggestion:** Before making edits, use `read_file` on existing project files to determine the indentation style (spaces vs. tabs, width). Check for configuration files like `.editorconfig`, `pyproject.toml`, `.prettierrc`, `.eslintrc.js`.
+        *   **Rule:** Consistently apply the identified project style in all `REPLACE` blocks.
+    *   **Strategic Use of `apply_diff` vs. `write_to_file`:**
+        *   **Suggestion:** Prefer `apply_diff` for targeted changes. Use multiple `SEARCH/REPLACE` blocks within a single `apply_diff` call for related changes in close proximity.
+        *   **Suggestion:** For unrelated changes in different parts of a file, consider separate `apply_diff` calls.
+        *   **Rule:** Only use `write_to_file` as a fallback for `apply_diff` if complex structural changes make diffing impractical or error-prone.
+    *   **Post-Change Verification (Optional but Recommended):**
+        *   **Suggestion:** If the project has automated linters or formatters, suggest running them via `execute_command` after applying changes to catch/fix indentation and style errors automatically.
+
 6.  **Coding Standards:**
     *   Follow Python best practices (PEP 8).
     *   Write clear, readable code.

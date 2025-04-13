@@ -1,8 +1,10 @@
 import argparse
+import queue
+import threading
+import dashboard_ui
 import os
 import time
 import numpy as np
-import threading
 import collections
 from pythonosc import dispatcher, osc_server
 import mne
@@ -59,7 +61,9 @@ NUM_EEG_CHANNELS = 4
 # Buffer sizes will be calculated based on args in main()
 eeg_data_buffers = None
 ppg_data_buffer = None 
-baseline_metrics = {} # Store baseline median and std dev
+baseline_metrics = {}  # Store baseline median and std dev
+acc_data_buffer = None
+last_acc_timestamp = 0
 data_lock = threading.Lock()
 # These globals will be managed by the main loop and passed to update_stress_state
 last_eeg_timestamp = 0
@@ -233,9 +237,23 @@ def handle_ppg(address, *args):
                 logging.error(f"Error processing PPG data: {e}") 
             except Exception as e: # Catch potential issues if buffers not initialized
                  logging.error(f"Unexpected error in handle_ppg: {e}")
-
+def handle_acc(address, *args):
+    global last_acc_timestamp, acc_data_buffer
+    ts = time.time()
+    if len(args) == 3:  # Expecting 3-axis data
+        with data_lock:
+            try:
+                acc_x, acc_y, acc_z = map(float, args)
+                acc_data_buffer.append((ts, (acc_x, acc_y, acc_z)))
+                last_acc_timestamp = ts
+            except (ValueError, TypeError) as e:
+                logging.error(f"Error processing ACC data: {e}")
+            except Exception as e:
+                logging.error(f"Unexpected error in handle_acc: {e}")
 
 def handle_default(address, *args):
+    # logging.debug(f"Received OSC message - Address: {address}, Arguments: {args}")
+    pass
     # logging.debug(f"Received OSC message - Address: {address}, Arguments: {args}") 
     pass
 
@@ -253,7 +271,7 @@ def start_osc_server(ip, port):
     disp = dispatcher.Dispatcher()
     disp.map("/eeg", handle_eeg)
     disp.map("/ppg", handle_ppg)
-    # Add mappings for other addresses if needed later (e.g., /acc)
+    disp.map("/acc", handle_acc)
     disp.set_default_handler(handle_default)
     
     try:
@@ -457,6 +475,13 @@ def main():
     ppg_buffer_size = int(args.ppg_sampling_rate * (args.baseline_duration + 15)) 
     eeg_data_buffers = [collections.deque(maxlen=eeg_buffer_size) for _ in range(NUM_EEG_CHANNELS)]
     ppg_data_buffer = collections.deque(maxlen=ppg_buffer_size)
+    
+    # Initialize queue for UI updates
+    update_queue = queue.Queue()
+
+    # Start the UI in a separate thread
+    ui_thread = threading.Thread(target=dashboard_ui.start_ui, args=(update_queue,), daemon=True, name="UIThread")
+    ui_thread.start()
 
     osc_server_instance, osc_thread = start_osc_server(args.osc_ip, args.osc_port)
     print("OSC server started (or attempted)") # Debug print
@@ -483,75 +508,67 @@ def main():
     try:
         logging.info("Starting real-time monitoring...")
         while True:
-            # Check if OSC server thread is still running
-            if osc_thread and not osc_thread.is_alive():
-                 logging.error("OSC server thread is no longer running. Exiting.")
-                 break # Exit main loop if server thread died unexpectedly
+            loop_start_time = time.time()
 
-            time.sleep(args.update_interval) # Use arg
-            
-            current_ratio = np.nan
-            current_hr = np.nan
-            eeg_window_samples = int(args.eeg_sampling_rate * args.eeg_window_duration) # Use args
-            ppg_window_samples = int(args.ppg_sampling_rate * args.ppg_window_duration) # Use args
-            
-            ts_now = time.time()
-            latest_ts = 0 # Track latest timestamp in the current window
-
+            # 1. Check for stale data
             with data_lock:
-                 # Check buffer lengths before attempting to grab windows
-                 if len(eeg_data_buffers[0]) >= eeg_window_samples and \
-                    len(ppg_data_buffer) >= ppg_window_samples:
-                    
-                    # Grab the most recent window of data
-                    eeg_window_tuples = [list(buf)[-eeg_window_samples:] for buf in eeg_data_buffers]
-                    ppg_window_tuples = list(ppg_data_buffer)[-ppg_window_samples:]
-                    
-                    # Extract timestamps and values
-                    eeg_timestamps = np.array([t for t, v in eeg_window_tuples[0]]) # Use first channel's timestamps
-                    eeg_values = np.array([[v for t, v in chan_tuples] for chan_tuples in eeg_window_tuples])
-                    ppg_timestamps = np.array([t for t, v in ppg_window_tuples])
-                    ppg_values = np.array([v for t, v in ppg_window_tuples])
-                    
-                    latest_eeg_ts = eeg_timestamps[-1] if len(eeg_timestamps) > 0 else 0
-                    latest_ppg_ts = ppg_timestamps[-1] if len(ppg_timestamps) > 0 else 0
-                    latest_ts = max(latest_eeg_ts, latest_ppg_ts)
+                time_since_last_eeg = loop_start_time - last_eeg_timestamp if last_eeg_timestamp > 0 else float('inf')
+                time_since_last_ppg = loop_start_time - last_ppg_timestamp if last_ppg_timestamp > 0 else float('inf')
 
-                    # Check for stale data
-                    if ts_now - latest_ts > args.stale_threshold:
-                        logging.warning(f"Stale data detected! Last sample age: {ts_now - latest_ts:.1f}s (Threshold: {args.stale_threshold}s)")
-                        # Set tentative state to uncertain due to stale data
-                        loop_tentative_history.append("Uncertain (Stale Data)") 
-                        # Skip feature calculation if data is stale
-                        continue 
-                    
-                    # Calculate features if data is fresh
-                    current_ratio = extract_alpha_beta_ratio(eeg_values, args.eeg_sampling_rate, args)
-                    current_hr = estimate_bpm_from_ppg(ppg_values, args.ppg_sampling_rate, args)
-                 else:
-                     logging.info("Waiting for sufficient data buffers...")
-                     # Optionally set tentative state to uncertain if buffers aren't full yet
-                     loop_tentative_history.append("Initializing") 
-                     continue # Skip this update cycle
+                if time_since_last_eeg > args.stale_threshold or time_since_last_ppg > args.stale_threshold:
+                    current_loop_state  = "Uncertain (Stale Data)"
+                    logging.warning(f"Stale data detected. Last EEG: {time_since_last_eeg:.1f}s, Last PPG: {time_since_last_ppg:.1f}s")
+                    time.sleep(args.update_interval) # Still wait
+                    continue # Skip feature extraction and state update
 
-            # Update state using the dedicated function
+                # 2. Extract features from recent data
+                # Use a copy of the data to minimize lock time
+                eeg_window_start_time = loop_start_time - args.eeg_window_duration
+                ppg_window_start_time = loop_start_time - args.ppg_window_duration
+
+                # Extract data within the window
+                recent_eeg_data = [ [item[1] for item in buf if item[0] >= eeg_window_start_time] for buf in eeg_data_buffers]
+                recent_ppg_data = [item[1] for item in ppg_data_buffer if item[0] >= ppg_window_start_time]
+
+            # Convert to numpy arrays for processing
+            if recent_eeg_data and all(len(channel_data) > 0 for channel_data in recent_eeg_data):
+                eeg_data_array = np.array(recent_eeg_data)
+            else:
+                eeg_data_array = None
+                logging.warning("Not enough recent EEG data to calculate A/B ratio.")
+
+            if recent_ppg_data:
+                ppg_data_array = np.array(recent_ppg_data)
+            else:
+                ppg_data_array = None
+                logging.warning("Not enough recent PPG data to calculate HR.")
+
+            # 3. Calculate features
+            current_ratio = extract_alpha_beta_ratio(eeg_data_array, args.eeg_sampling_rate, args) if eeg_data_array is not None else np.nan
+            current_hr = estimate_bpm_from_ppg(ppg_data_array, args.ppg_sampling_rate, args)  if ppg_data_array is not None else np.nan
+
+            # 4. Update stress state
             current_loop_state = update_stress_state(
-                current_ratio, current_hr, baseline_metrics, 
-                current_loop_state, loop_tentative_history, args
-            )
+                current_ratio, current_hr, baseline_metrics, current_loop_state, loop_tentative_history, args)
 
-            # Log current state and features
-            logging.info(f"State: {current_loop_state} | Ratio: {current_ratio:.2f} | HR: {current_hr:.1f} BPM")
+            # Send data to the UI queue
+            update_queue.put({"state": current_loop_state,
+                              "ratio": current_ratio,
+                              "hr": current_hr})
+
+            # 5. Enforce loop timing
+            loop_end_time = time.time()
+            loop_duration = loop_end_time - loop_start_time
+            sleep_duration = max(0, args.update_interval - loop_duration)
+            time.sleep(sleep_duration)
 
     except KeyboardInterrupt:
-        logging.info("Keyboard interrupt received. Shutting down.")
-    except Exception as e:
-        logging.exception(f"An unexpected error occurred in the main loop: {e}")
+        logging.info("Exiting monitoring loop.")
     finally:
+        logging.info("Shutting down OSC server...")
         if osc_server_instance:
-            logging.info("Shutting down OSC server.")
             osc_server_instance.shutdown()
-        logging.info("Stress monitor stopped.")
+        logging.info("Monitoring application exiting.")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

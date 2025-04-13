@@ -1,6 +1,12 @@
 # Changelog
 
 ## [Unreleased] - 2025-04-12 (Late Evening - Phase 1 Completion & Debugging)
+:start_line:4
+:end_line:6
+-------
+
+### Changed
+*   Updated `README.md` to reflect that Phase 2 is now in progress.
 
 ### Added
 *   **Debug Logging:** Added print statements and logging in `main()` and `calculate_baseline()` functions in `stress_monitor.py` to diagnose hanging issue.
@@ -15,7 +21,7 @@
 
 ---
 
-## [Unreleased] - 2025-04-12 (Evening - Hackathon Pivot)
+## [Unreleased] - 2025-04-12 (Late Night - Phase 2 Start)
 
 ### Added
 *   **Project Pivot:** Shifted focus from Motor Imagery BCI to "BrainTrade - Mental State Monitor".

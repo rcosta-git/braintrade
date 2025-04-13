@@ -5,7 +5,7 @@
 
 **Objective:** Enhance the Phase 1 monitor by adding Computer Vision (basic facial expression) and Accelerometer data (movement level) to provide a richer view of the trader's state via a simple dashboard.
 
-**Core Script:** Continue modifying `stress_monitor.py` (or refactor if needed).
+**Core Scripts:** Core logic in `stress_monitor.py`, UI presentation in a new `dashboard_ui.py`.
 
 **1. Computer Vision Integration (Facial Expression):**
     *   **Goal:** Detect basic emotional expressions from webcam feed.
@@ -54,11 +54,12 @@
 
 **4. UI Dashboard (Refined for Future Web UI):**
     *   **Goal:** Display multiple indicators clearly in a dedicated view, designed for later migration.
-    *   **Implementation Approach (Prioritized):** **Simple GUI using `tkinter`**.
-        *   *Reasoning:* Built-in, allows dedicated window, feasible for hackathon.
-        *   *Key Elements:* Labels for metrics, display fields (`tkinter.StringVar`), use colors for state.
-        *   **Modularity Principle:** **Crucially, keep UI update logic separate from core data processing and state calculation.** The main loop should calculate the state and metrics, then pass this information (e.g., via a shared dictionary with a lock, or a queue) to a dedicated UI update function. The UI function should *only* read this state information and update the `tkinter` widgets. This separation is key for replacing the `tkinter` frontend later.
-        *   *Fallback:* **Enhanced Console using `rich`**. Apply the same modularity principle – calculate state separately, pass to a function that updates the `rich` display.
+    *   **Implementation Approach (Prioritized):** **Simple GUI using `tkinter` in `dashboard_ui.py`**.
+        *   *Reasoning:* Built-in, allows dedicated window, feasible for hackathon, promotes modularity.
+        *   *File Structure:* `dashboard_ui.py` will contain the `tkinter` window setup, widgets (labels, display fields using `tkinter.StringVar`), and UI update functions.
+        *   **Interaction:** `stress_monitor.py` will calculate the state and metrics, then pass this information (e.g., via a shared dictionary with a lock, or a queue) to the UI update function in `dashboard_ui.py`. `stress_monitor.py` will likely manage the UI lifecycle (e.g., starting the `tkinter` main loop, possibly in a separate thread).
+        *   **Modularity:** This separation ensures UI logic is distinct from core processing, simplifying maintenance and future replacement (e.g., with a web UI).
+        *   *Fallback:* **Enhanced Console using `rich` in `dashboard_ui.py`**. Apply the same interaction pattern – `stress_monitor.py` calculates state, passes it to an update function in `dashboard_ui.py` that manages the `rich` display.
     *   **Display Content:** Show current overall state (e.g., "Calm", "Focused", "Stressed"), detected expression, movement level (e.g., "Low", "Medium", "High"), HR (BPM), Alpha/Beta ratio.
 
 **5. Key Libraries (Additions):**
@@ -71,5 +72,6 @@
     *   Add ACC baseline calculation.
     *   Choose and integrate CV library for expression detection (run in separate thread).
     *   Refine state logic to incorporate new inputs.
-    *   Implement chosen UI dashboard approach.
+    *   Create `dashboard_ui.py` for UI components.
+    *   Implement chosen UI dashboard approach within `dashboard_ui.py`.
     *   Test interactions between components.
