@@ -431,80 +431,16 @@ def update_stress_state(current_ratio, current_hr, baseline_metrics, current_sta
 
     return new_state
 
-
-# --- Main Application Logic ---
-
-def main():
-    print("Entering main function")  # Debug print
-    logging.info("Entering main function") # Debug log
-    global eeg_data_buffers, ppg_data_buffer # Declare globals needed before baseline
-
-    parser = argparse.ArgumentParser(description='Real-time Stress Monitor (OSC)')
-    # OSC Args
-    parser.add_argument('--osc-ip', type=str, default="0.0.0.0", help='OSC server IP address')
-    parser.add_argument('--osc-port', type=int, default=5001, help='OSC server port')
-    # Timing Args
-    parser.add_argument('--baseline-duration', type=int, default=BASELINE_DURATION, help='Duration of baseline calculation (seconds)')
-    parser.add_argument('--update-interval', type=float, default=UPDATE_INTERVAL, help='How often to calculate features and update state (seconds)')
-    parser.add_argument('--stale-threshold', type=float, default=STALE_DATA_THRESHOLD, dest='stale_threshold', help='Max age for data to be considered fresh (seconds)')
-    # EEG Args
-    parser.add_argument('--eeg-sr', type=int, default=EEG_SAMPLING_RATE, dest='eeg_sampling_rate', help='EEG sampling rate (Hz)')
-    parser.add_argument('--eeg-window', type=float, default=EEG_WINDOW_DURATION, dest='eeg_window_duration', help='EEG window duration for analysis (seconds)')
-    parser.add_argument('--nfft', type=int, default=EEG_NFFT, help='FFT length for PSD calculation')
-    parser.add_argument('--eeg-lowcut', type=float, default=EEG_FILTER_LOWCUT, dest='eeg_filter_low', help='EEG filter lowcut frequency (Hz)')
-    parser.add_argument('--eeg-highcut', type=float, default=EEG_FILTER_HIGHCUT, dest='eeg_filter_high', help='EEG filter highcut frequency (Hz)')
-    parser.add_argument('--alpha-band', type=float, nargs=2, default=ALPHA_BAND, help='Alpha band frequency range (Hz)')
-    parser.add_argument('--beta-band', type=float, nargs=2, default=BETA_BAND, help='Beta band frequency range (Hz)')
-    # PPG Args
-    parser.add_argument('--ppg-sr', type=int, default=PPG_SAMPLING_RATE, dest='ppg_sampling_rate', help='PPG sampling rate (Hz)')
-    parser.add_argument('--ppg-window', type=float, default=PPG_WINDOW_DURATION, dest='ppg_window_duration', help='PPG window duration for analysis (seconds)')
-    parser.add_argument('--ppg-lowcut', type=float, default=PPG_FILTER_LOWCUT, dest='ppg_filter_low', help='PPG filter lowcut frequency (Hz)')
-    parser.add_argument('--ppg-highcut', type=float, default=PPG_FILTER_HIGHCUT, dest='ppg_filter_high', help='PPG filter highcut frequency (Hz)')
-    parser.add_argument('--ppg-peak-dist', type=float, default=PPG_PEAK_MIN_DIST_FACTOR, dest='ppg_peak_min_dist_factor', help='PPG peak minimum distance factor')
-    parser.add_argument('--ppg-peak-height', type=float, default=PPG_PEAK_HEIGHT_FACTOR, dest='ppg_peak_height_factor', help='PPG peak minimum height factor (relative to std dev)')
-    # State Logic Args
-    parser.add_argument('--persistence', type=int, default=STATE_PERSISTENCE_UPDATES, help='Number of consecutive updates for state change')
-    parser.add_argument('--ratio-threshold', type=float, default=RATIO_THRESHOLD, dest='ratio_threshold', help='SD multiplier for ratio threshold')
-    parser.add_argument('--hr-threshold', type=float, default=HR_THRESHOLD, dest='hr_threshold', help='SD multiplier for HR threshold')
-    
-    args = parser.parse_args()
-
-    # --- Initialize Buffers based on args ---
-    # Calculate buffer sizes based on baseline duration and sampling rates from args
-    eeg_buffer_size = int(args.eeg_sampling_rate * (args.baseline_duration + 15)) 
-    ppg_buffer_size = int(args.ppg_sampling_rate * (args.baseline_duration + 15)) 
-    eeg_data_buffers = [collections.deque(maxlen=eeg_buffer_size) for _ in range(NUM_EEG_CHANNELS)]
-    ppg_data_buffer = collections.deque(maxlen=ppg_buffer_size)
-    
-    # Initialize queue for UI updates
-    update_queue = queue.Queue()
-
-    # Start the UI in a separate thread
-    ui_thread = threading.Thread(target=dashboard_ui.start_ui, args=(update_queue,), daemon=True, name="UIThread")
-    ui_thread.start()
-
-    osc_server_instance, osc_thread = start_osc_server(args.osc_ip, args.osc_port)
-    print("OSC server started (or attempted)") # Debug print
-    logging.info("OSC server started (or attempted)") # Debug log
-    
-    if osc_server_instance is None:
-        logging.error("Failed to initialize OSC server. Exiting.")
-        return # Exit if server setup failed
-
-    # --- Calculate Baseline ---
-    if not calculate_baseline(args.baseline_duration, args): # Pass args
-        print("calculate_baseline returned False") # Debug print
-        logging.info("calculate_baseline returned False") # Debug log
-        logging.error("Exiting due to baseline calculation failure.")
-        if osc_server_instance: 
-            osc_server_instance.shutdown()
-        return
-
+# --- Data Processing Loop ---
+def processing_loop(args, update_queue, baseline_metrics):
+    """
+    Main loop for processing OSC data, calculating features, and updating the stress state.
+    Runs in a separate thread.
+    """
     # --- Initialize state variables for the loop ---
     current_loop_state = "Initializing" # State variable specific to the loop
     loop_tentative_history = collections.deque(maxlen=args.persistence) # Use arg
 
-    # --- Real-time Monitoring Loop ---
     try:
         logging.info("Starting real-time monitoring...")
         while True:
@@ -554,7 +490,9 @@ def main():
             # Send data to the UI queue
             update_queue.put({"state": current_loop_state,
                               "ratio": current_ratio,
-                              "hr": current_hr})
+                              "hr": current_hr,
+                              "expression": "N/A", # Placeholder
+                              "movement": "N/A"}) # Placeholder
 
             # 5. Enforce loop timing
             loop_end_time = time.time()
@@ -564,11 +502,72 @@ def main():
 
     except KeyboardInterrupt:
         logging.info("Exiting monitoring loop.")
-    finally:
-        logging.info("Shutting down OSC server...")
-        if osc_server_instance:
-            osc_server_instance.shutdown()
-        logging.info("Monitoring application exiting.")
+    except Exception as e:
+        logging.exception(f"Error in processing loop: {e}")
 
-if __name__ == "__main__":
-    main()
+# --- Main Application Logic ---
+
+def main():
+    print("Entering main function")  # Debug print
+    logging.info("Entering main function") # Debug log
+    global eeg_data_buffers, ppg_data_buffer # Declare globals needed before baseline
+
+    parser = argparse.ArgumentParser(description='Real-time Stress Monitor (OSC)')
+    # OSC Args
+    parser.add_argument('--osc-ip', type=str, default="0.0.0.0", help='OSC server IP address')
+    parser.add_argument('--osc-port', type=int, default=5001, help='OSC server port')
+    # Timing Args
+    parser.add_argument('--baseline-duration', type=int, default=BASELINE_DURATION, help='Duration of baseline calculation (seconds)')
+    parser.add_argument('--update-interval', type=float, default=UPDATE_INTERVAL, help='How often to calculate features and update state (seconds)')
+    parser.add_argument('--stale-threshold', type=float, default=STALE_DATA_THRESHOLD, dest='stale_threshold', help='Max age for data to be considered fresh (seconds)')
+    # EEG Args
+    parser.add_argument('--eeg-sr', type=int, default=EEG_SAMPLING_RATE, dest='eeg_sampling_rate', help='EEG sampling rate (Hz)')
+    parser.add_argument('--eeg-window', type=float, default=EEG_WINDOW_DURATION, dest='eeg_window_duration', help='EEG window duration for analysis (seconds)')
+    parser.add_argument('--nfft', type=int, default=EEG_NFFT, help='FFT length for PSD calculation')
+    parser.add_argument('--eeg-lowcut', type=float, default=EEG_FILTER_LOWCUT, dest='eeg_filter_low', help='EEG filter lowcut frequency (Hz)')
+    parser.add_argument('--eeg-highcut', type=float, default=EEG_FILTER_HIGHCUT, dest='eeg_filter_high', help='EEG filter highcut frequency (Hz)')
+    parser.add_argument('--alpha-band', type=float, nargs=2, default=ALPHA_BAND, help='Alpha band frequency range (Hz)')
+    parser.add_argument('--beta-band', type=float, nargs=2, default=BETA_BAND, help='Beta band frequency range (Hz)')
+    # PPG Args
+    parser.add_argument('--ppg-sr', type=int, default=PPG_SAMPLING_RATE, dest='ppg_sampling_rate', help='PPG sampling rate (Hz)')
+    parser.add_argument('--ppg-window', type=float, default=PPG_WINDOW_DURATION, dest='ppg_window_duration', help='PPG window duration for analysis (seconds)')
+    parser.add_argument('--ppg-lowcut', type=float, default=PPG_FILTER_LOWCUT, dest='ppg_filter_low', help='PPG filter lowcut frequency (Hz)')
+    parser.add_argument('--ppg-highcut', type=float, default=PPG_FILTER_HIGHCUT, dest='ppg_filter_high', help='PPG filter highcut frequency (Hz)')
+    parser.add_argument('--ppg-peak-dist', type=float, default=PPG_PEAK_MIN_DIST_FACTOR, dest='ppg_peak_min_dist_factor', help='PPG peak minimum distance factor')
+    parser.add_argument('--ppg-peak-height', type=float, default=PPG_PEAK_HEIGHT_FACTOR, dest='ppg_peak_height_factor', help='PPG peak minimum height factor (relative to std dev)')
+    # State Logic Args
+    parser.add_argument('--persistence', type=int, default=STATE_PERSISTENCE_UPDATES, help='Number of consecutive updates for state change')
+    parser.add_argument('--ratio-threshold', type=float, default=RATIO_THRESHOLD, dest='ratio_threshold', help='SD multiplier for ratio threshold')
+    parser.add_argument('--hr-threshold', type=float, default=HR_THRESHOLD, dest='hr_threshold', help='SD multiplier for HR threshold')
+    
+    args = parser.parse_args()
+
+    # --- Initialize Buffers based on args ---
+    # Calculate buffer sizes based on baseline duration and sampling rates from args
+    eeg_buffer_size = int(args.eeg_sampling_rate * (args.baseline_duration + 15)) 
+    ppg_buffer_size = int(args.ppg_sampling_rate * (args.baseline_duration + 15)) 
+    eeg_data_buffers = [collections.deque(maxlen=eeg_buffer_size) for _ in range(NUM_EEG_CHANNELS)]
+    ppg_data_buffer = collections.deque(maxlen=ppg_buffer_size)
+    
+    # Initialize queue for UI updates
+    update_queue = queue.Queue()
+
+    # Start OSC Server Thread
+    osc_server_instance, osc_thread = start_osc_server(args.osc_ip, args.osc_port)
+    if osc_server_instance is None:
+        logging.error("Failed to initialize OSC server. Exiting.")
+        return
+
+    # --- Calculate Baseline ---
+    if not calculate_baseline(args.baseline_duration, args): # Pass args
+        print("calculate_baseline returned False") # Debug print
+        logging.info("calculate_baseline returned False") # Debug log
+        logging.error("Exiting due to baseline calculation failure.")
+        if osc_server_instance: 
+            osc_server_instance.shutdown()
+        return
+
+    # Start Processing Thread
+    processing_thread = threading.Thread(
+        target=processing_loop,
+        args=(args, update_queue, baseline_metrics), # Pass necessary args/data
