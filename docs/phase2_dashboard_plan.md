@@ -5,7 +5,7 @@
 
 **Objective:** Enhance the Phase 1 monitor by adding Computer Vision (basic facial expression) and Accelerometer data (movement level) to provide a richer view of the trader's state via a simple dashboard.
 
-**Core Scripts:** Core logic in `stress_monitor.py`, UI presentation in a new `dashboard_ui.py`.
+**Core Scripts:** Core logic now modularized in `braintrade_monitor` package (Python modules), orchestrated by `main.py`. UI presentation in `dashboard_ui.py`.
 
 **1. Computer Vision Integration (Facial Expression):**
     *   **Goal:** Detect basic emotional expressions from webcam feed.
@@ -98,23 +98,4 @@
     *   Baseline calculation (using EEG ratio and PPG HR) completes successfully.
     *   The real-time processing loop runs, calculates features (EEG ratio, PPG HR), determines state based on Phase 1 logic, and sends updates to the UI.
     *   The `tkinter` UI displays the updating state, ratio, and HR values.
-
-**Remaining Tasks for Phase 2 (Based on Plan Above):**
-
-1.  **Accelerometer (ACC) Integration:**
-    *   Implement feature calculation (`get_movement_metric`) using data from `data_store.py`.
-    *   Add baseline calculation for the movement metric.
-    *   Implement movement level mapping (`get_movement_level`).
-    *   Integrate `current_movement_level` into `state_logic.py`.
-    *   Display movement level in `dashboard_ui.py`.
-2.  **Computer Vision (CV) Integration:**
-    *   Select and install the chosen CV library (`fer` + `tensorflow` preferred, or fallback). Add to `requirements.txt`.
-    *   Implement webcam capture and facial expression analysis (likely requires a separate thread/process managed by `main.py`).
-    *   Feed the detected `current_expression` into the `processing_loop` (potentially via the `data_store` or another queue).
-    *   Integrate `current_expression` into `state_logic.py`.
-    *   Display the detected expression in `dashboard_ui.py`.
-3.  **State Logic Enhancement:**
-    *   Update the rules in `state_logic.update_stress_state` to incorporate `current_movement_level` and `current_expression` according to the logic defined in the Phase 2 plan.
-4.  **Dependency Management:** Ensure `requirements.txt` is updated with any new libraries (especially for CV).
-
-**Overall Status:** The foundational structure for Phase 2 is complete and tested with synthetic data for the existing Phase 1 features (EEG ratio, HR). The next steps involve integrating the new data streams (ACC, CV) and updating the state logic and UI accordingly.
+    *   Unit tests have been added and are passing for `feature_extraction`, `state_logic`, `data_store`, and `baseline` modules.

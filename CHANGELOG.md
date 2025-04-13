@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased] - 2025-04-13 (Early Morning - Refactoring & Unit Tests)
+
+### Refactored
+*   **Modularized Codebase:** Refactored `stress_monitor.py` into a `braintrade_monitor` Python package with modules for config, data store, feature extraction, OSC handling, baseline, state logic, and processing.
+*   **Main Script:** Created new `main.py` to orchestrate the modular application.
+
+### Added
+*   **Unit Tests:** Added comprehensive unit tests in the `tests/` directory for:
+    *   `braintrade_monitor/feature_extraction.py` (9 tests)
+    *   `braintrade_monitor/state_logic.py` (11 tests)
+    *   `braintrade_monitor/data_store.py` (10 tests)
+    *   `braintrade_monitor/baseline.py` (8 tests)
+
+### Fixed
+*   **apply_diff Indentation Issues:** Addressed potential indentation problems when using `apply_diff` tool by providing detailed guidelines in `docs/llm_collaboration_preferences.md`.
+*   **EEG Data Handling:** Fixed issue in `send_synthetic_osc.py` where EEG data was being sent with incorrect formatting (flattened list), now sends sample-by-sample.
+*   **MNE Filtering Error:** Fixed `ValueError` in `extract_alpha_beta_ratio` related to `picks='all'` argument in `mne.filter.filter_data`.
+*   **Unit Test Errors:** Addressed `NameError` in `tests/test_feature_extraction.py` and `tests/test_baseline.py`, and `AssertionError` and `TypeError` in `tests/test_data_store.py` and `tests/test_processing.py`, resulting in all unit tests now passing.
+
+---
+
 ## [Unreleased] - 2025-04-12 (Late Evening - Phase 1 Completion & Debugging)
 :start_line:4
 :end_line:6
@@ -77,6 +98,5 @@
 *   Corrected `try...except...finally` block structure in `motor_imagery_trainer.py`.
 *   Adjusted `train_test_split` logic in `motor_imagery_trainer.py` to handle small sample sizes during testing better.
 *   Fixed various `AttributeError` and `NameError` issues in `combined_trainer.py` related to missing arguments and variables during artifact saving.
-*   Fixed `ValueError` in `combined_trainer.py` during epoch concatenation due to mismatched time points by adding cropping logic.
 *   Fixed `ValueError` in `extract_band_power_features` (in trainer scripts) when encountering short epochs by dynamically adjusting `n_fft`.
 *   Fixed `NameError` for `csp_plot_filename` during logging in `combined_trainer.py`.
