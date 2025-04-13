@@ -66,7 +66,10 @@ def extract_band_power_features(epochs_data, sampling_rate, bands):
     features = np.zeros((n_epochs, n_channels * n_bands))
     for i, epoch_data in enumerate(epochs_data):
         for j, channel_data in enumerate(epoch_data):
-            psd, freqs = psd_array_welch(channel_data, sfreq=sampling_rate, fmin=min(b[0] for b in bands.values()), fmax=max(b[1] for b in bands.values()))
+            n_times = len(channel_data)
+            n_fft = min(n_times, 256) # Use segment length if smaller than default n_fft
+            if n_fft == 0: continue # Skip if segment is empty
+            psd, freqs = psd_array_welch(channel_data, sfreq=sampling_rate, fmin=min(b[0] for b in bands.values()), fmax=max(b[1] for b in bands.values()), n_fft=n_fft, n_per_seg=n_fft) # Pass n_fft and n_per_seg
             band_powers = []
             for band_name, (fmin, fmax) in bands.items():
                 band_power = np.mean(psd[(freqs >= fmin) & (freqs <= fmax)])
@@ -111,7 +114,7 @@ def main():
             print(f"\nTrial {trial_num + 1}/{total_trials}: Get Ready...")
             time.sleep(args.cue_duration)
             cue_text = "LEFT" if label == LEFT_MARKER else "RIGHT"
-            print(f"Trial {trial_num + 1}/{total_trials}: Cue: {cue_text}. Imagine the feeling of moving your {cue_text.lower()} hand/arm...")
+            print(f"Trial {trial_num + 1}/{total_trials}: Cue: {cue_text}. Imagine the feeling of moving your {cue_text.lower()}...")
             with data_lock:
                 for buf in eeg_data_buffers:
                     buf.clear()
