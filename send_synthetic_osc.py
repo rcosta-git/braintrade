@@ -4,15 +4,20 @@ import random
 import numpy as np
 from pythonosc import udp_client
 
-def generate_eeg(num_channels, sampling_rate):
-    """Generates synthetic EEG data (random noise with some sinusoidal components)."""
-    data = np.random.normal(0, 5, size=(num_channels, sampling_rate))  # Noise with a range of -5 to 5
-    # Add some low-frequency sinusoidal components to mimic brainwaves
+# Keep track of phase for sinusoidal components across calls
+_eeg_time = 0
+_eeg_freqs = [random.uniform(1, 10) for _ in range(4)] # Fixed frequencies per channel for consistency
+
+def generate_eeg_sample(num_channels, sampling_rate):
+    """Generates a single synthetic EEG sample (list of floats for each channel)."""
+    global _eeg_time
+    data_sample = np.random.normal(0, 5, size=num_channels) # Base noise for this sample
+    # Add sinusoidal component based on current time step
+    t_step = _eeg_time
     for i in range(num_channels):
-        freq = random.uniform(1, 10)  # Random frequency between 1 and 10 Hz
-        t = np.linspace(0, 1, sampling_rate, endpoint=False)
-        data[i, :] += 2 * np.sin(2 * np.pi * freq * t)  # Amplitude of 2
-    return data.tolist()
+        data_sample[i] += 2 * np.sin(2 * np.pi * _eeg_freqs[i] * t_step)
+    _eeg_time += 1.0 / sampling_rate # Increment time step
+    return data_sample.tolist()
 
 def generate_ppg(sampling_rate, avg_hr=60):
     """Generates synthetic PPG data (sine wave with noise, simulating heartbeats)."""
@@ -42,6 +47,12 @@ def main():
     args = parser.parse_args()
 
     client = udp_client.SimpleUDPClient(args.ip, args.port)
+    print(f"--- Synthetic OSC Sender ---")
+    print(f"Target IP: {args.ip}")
+    print(f"Target Port: {args.port}")
+    print(f"Sending /eeg @ ~256Hz, /ppg @ ~64Hz, /acc @ ~50Hz")
+    print(f"Press Ctrl+C to stop.")
+    print(f"--------------------------")
 
     # Target frequencies (Hz)
     eeg_freq = 256
@@ -62,20 +73,33 @@ def main():
 
             # Send EEG data
             if current_time - eeg_last_sent >= 1.0 / eeg_freq:
-                eeg_data = generate_eeg(num_eeg_channels, eeg_freq)
-                client.send_message("/eeg", eeg_data)
+                try:
+                    try:
+                        # Generate a single sample (list of 4 floats)
+                        eeg_sample = generate_eeg_sample(num_eeg_channels, eeg_freq)
+                        client.send_message("/eeg", eeg_sample)
+                    except Exception as e:
+                        print(f"Error sending EEG data: {e}")
+                except Exception as e:
+                    print(f"Error sending EEG data: {e}")
                 eeg_last_sent = current_time
 
             # Send PPG data
             if current_time - ppg_last_sent >= 1.0 / ppg_freq:
-                ppg_data = generate_ppg(ppg_freq)
-                client.send_message("/ppg", ppg_data)
+                try:
+                    ppg_data = generate_ppg(ppg_freq)
+                    client.send_message("/ppg", ppg_data)
+                except Exception as e:
+                    print(f"Error sending PPG data: {e}")
                 ppg_last_sent = current_time
 
             # Send ACC data
             if current_time - acc_last_sent >= 1.0 / acc_freq:
-                acc_data = generate_acc(acc_freq)
-                client.send_message("/acc", acc_data)
+                try:
+                    acc_data = generate_acc(acc_freq)
+                    client.send_message("/acc", acc_data)
+                except Exception as e:
+                    print(f"Error sending ACC data: {e}")
                 acc_last_sent = current_time
 
             time.sleep(0.001)  # Small sleep to prevent busy-waiting

@@ -75,3 +75,46 @@
     *   Create `dashboard_ui.py` for UI components.
     *   Implement chosen UI dashboard approach within `dashboard_ui.py`.
     *   Test interactions between components.
+
+---
+
+## Phase 2 Progress Summary (as of 2025-04-13 ~00:57 AM)
+
+**Key Accomplishments:**
+
+1.  **Code Refactoring:**
+    *   The original monolithic `stress_monitor.py` script has been successfully refactored into a modular Python package named `braintrade_monitor`.
+    *   This package separates concerns into distinct modules: `config.py`, `data_store.py`, `feature_extraction.py`, `osc_handler.py`, `baseline.py`, `state_logic.py`, `processing.py`, and `logging_setup.py`.
+    *   A new `main.py` script serves as the application entry point, orchestrating the modules.
+2.  **UI Implementation & Integration:**
+    *   A dedicated `dashboard_ui.py` file was created using `tkinter` to display the monitor's output.
+    *   The UI was integrated with the core processing logic using a thread-safe `queue.Queue`.
+    *   Threading issues specific to macOS UI updates were resolved by ensuring `tkinter` operations run exclusively on the main thread using `root.after()`.
+3.  **Synthetic Data Generation:**
+    *   A `send_synthetic_osc.py` script was created to simulate EEG, PPG, and ACC OSC data streams, enabling testing without physical hardware.
+    *   Issues with data formatting (specifically EEG) in the synthetic sender were identified and corrected.
+4.  **Core Functionality Testing:**
+    *   The refactored application successfully runs using the synthetic data sender.
+    *   Baseline calculation (using EEG ratio and PPG HR) completes successfully.
+    *   The real-time processing loop runs, calculates features (EEG ratio, PPG HR), determines state based on Phase 1 logic, and sends updates to the UI.
+    *   The `tkinter` UI displays the updating state, ratio, and HR values.
+
+**Remaining Tasks for Phase 2 (Based on Plan Above):**
+
+1.  **Accelerometer (ACC) Integration:**
+    *   Implement feature calculation (`get_movement_metric`) using data from `data_store.py`.
+    *   Add baseline calculation for the movement metric.
+    *   Implement movement level mapping (`get_movement_level`).
+    *   Integrate `current_movement_level` into `state_logic.py`.
+    *   Display movement level in `dashboard_ui.py`.
+2.  **Computer Vision (CV) Integration:**
+    *   Select and install the chosen CV library (`fer` + `tensorflow` preferred, or fallback). Add to `requirements.txt`.
+    *   Implement webcam capture and facial expression analysis (likely requires a separate thread/process managed by `main.py`).
+    *   Feed the detected `current_expression` into the `processing_loop` (potentially via the `data_store` or another queue).
+    *   Integrate `current_expression` into `state_logic.py`.
+    *   Display the detected expression in `dashboard_ui.py`.
+3.  **State Logic Enhancement:**
+    *   Update the rules in `state_logic.update_stress_state` to incorporate `current_movement_level` and `current_expression` according to the logic defined in the Phase 2 plan.
+4.  **Dependency Management:** Ensure `requirements.txt` is updated with any new libraries (especially for CV).
+
+**Overall Status:** The foundational structure for Phase 2 is complete and tested with synthetic data for the existing Phase 1 features (EEG ratio, HR). The next steps involve integrating the new data streams (ACC, CV) and updating the state logic and UI accordingly.
