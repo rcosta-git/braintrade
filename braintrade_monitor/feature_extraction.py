@@ -97,7 +97,7 @@ def extract_alpha_beta_ratio(eeg_data, sampling_rate):
     if eeg_data is None:
         return np.nan
 
-    bands = {'Alpha': config.ALPHA_BAND, 'Beta': config.BETA_BAND}
+    bands = {'Theta': config.THETA_BAND, 'Alpha': config.ALPHA_BAND, 'Beta': config.BETA_BAND}
     # Expecting numpy array already
     if not isinstance(eeg_data, np.ndarray) or eeg_data.ndim != 2:
          logging.error(f"Invalid EEG data format: Expected 2D numpy array, got {type(eeg_data)}")
@@ -190,5 +190,7 @@ def extract_alpha_beta_ratio(eeg_data, sampling_rate):
         # logging.warning(f"Warning: Invalid average alpha ({alpha_power}) or beta ({beta_power}) power, returning NaN")
         return np.nan
 
-    alpha_beta_ratio = alpha_power / beta_power
-    return alpha_beta_ratio
+    alpha_beta_ratio = alpha_power / beta_power if beta_power > config.EPSILON else np.nan
+    theta_power = np.nanmean(band_powers['Theta'])
+
+    return alpha_beta_ratio, theta_power

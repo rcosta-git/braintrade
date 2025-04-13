@@ -4,7 +4,7 @@ import collections # Needed for type hinting if used
 
 from . import config
 
-def update_stress_state(current_ratio, current_hr,current_expression, current_movement, baseline_metrics, current_state, tentative_state_history: collections.deque):
+def update_stress_state(current_ratio, current_hr, current_expression, current_movement, current_theta, baseline_metrics, current_state, tentative_state_history: collections.deque):
     """
     Determines the tentative stress state based on current features and baseline metrics,
     and applies persistence logic to update the official current_state.
@@ -14,8 +14,8 @@ def update_stress_state(current_ratio, current_hr,current_expression, current_mo
         current_hr (float): The latest calculated Heart Rate (BPM).
         current_expression (str): The latest detected facial expression.
         current_movement (float): The latest calculated movement metric.
-        baseline_metrics (dict): Dictionary containing 'ratio_median', 'ratio_std',
-                                 'hr_median', 'hr_std'.
+        current_theta (float): The latest calculated Theta power.
+        baseline_metrics (dict): Dictionary containing 'ratio_median', 'ratio_std', 'hr_median', 'hr_std', 'theta_median', 'theta_std'.
         current_state (str): The current official state before this update.
         tentative_state_history (collections.deque): A deque (managed by the caller)
                                                      storing recent tentative states.
@@ -26,10 +26,10 @@ def update_stress_state(current_ratio, current_hr,current_expression, current_mo
     new_state = current_state # Default to current state unless persistence logic changes it
 
     # 1. Determine Tentative State
-    if np.isnan(current_ratio) or np.isnan(current_hr) or current_expression == "N/A" or np.isnan(current_movement):
+    if np.isnan(current_ratio) or np.isnan(current_hr) or current_expression == "N/A" or np.isnan(current_movement) or np.isnan(current_theta):
         # logging.warning("Cannot determine state due to NaN feature value.") # Logged by caller
         tentative_state = "Uncertain (NaN)"
-    elif not baseline_metrics or 'ratio_median' not in baseline_metrics or 'hr_median' not in baseline_metrics:
+    elif not baseline_metrics or 'ratio_median' not in baseline_metrics or 'hr_median' not in baseline_metrics or 'theta_median' not in baseline_metrics:
         logging.warning("Baseline metrics not available, cannot determine state.")
         tentative_state = "Initializing" # Should only happen briefly at start
     else:
@@ -54,10 +54,14 @@ def update_stress_state(current_ratio, current_hr,current_expression, current_mo
         is_expression_neutral = current_expression == "Neutral"
         is_physio_calm = not is_ratio_low and not is_hr_high
         is_movement_low = current_movement < movement_upper_bound if not np.isnan(current_movement) else False
+        theta_upper_bound = baseline_metrics['theta_median'] + config.THETA_THRESHOLD * baseline_metrics['theta_std']
+        is_theta_high = current_theta > theta_upper_bound if not np.isnan(current_theta) else False
 
-        # --- Phase 2 Logic ---
-        # Order: Stress -> Warning -> Calm -> Other
-        if (is_ratio_low and is_hr_high) or (is_expression_stressed and (is_hr_high or is_movement_high)):
+        # --- Phase 3 Logic ---
+        # Order: Drowsy/Distracted -> Stress -> Warning -> Calm -> Other
+        if is_theta_high and is_movement_low:
+            tentative_state = "Drowsy/Distracted"
+        elif (is_ratio_low and is_hr_high) or (is_expression_stressed and (is_hr_high or is_movement_high)):
             tentative_state = "Stress/Tilted"
         elif is_ratio_low or is_hr_high: # Check for Warning state if not Stress
              tentative_state = "Warning"
@@ -65,6 +69,7 @@ def update_stress_state(current_ratio, current_hr,current_expression, current_mo
             tentative_state = "Calm/Focused"
         else: # Default to Other/Uncertain if none of the above match
             tentative_state = "Other/Uncertain"
+        # --- End Phase 3 Logic ---
         # --- End Phase 2 Logic ---
 
 
@@ -118,5 +123,5 @@ if __name__ == '__main__':
     ]
 
     for ratio, hr, expression, movement in inputs:
-        state = update_stress_state(ratio, hr, expression, movement, baseline, state, history)
+        state = update_stress_state(ratio, hr, expression, movement, 0.0, baseline, state, history)
         print(f"Input (R:{ratio:.1f}, HR:{hr:.0f}, E:{expression}, M:{movement:.1f}) -> Tentative: {history[-1]:<15} | Official State: {state:<15} | History: {list(history)}")

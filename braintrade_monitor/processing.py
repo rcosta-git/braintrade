@@ -10,6 +10,7 @@ from . import data_store
 from . import feature_extraction
 from . import state_logic
 from . import cv_handler
+
 def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
     """
     Main loop for processing sensor data, calculating features, updating state,
@@ -26,97 +27,144 @@ def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
     # Deque for storing recent tentative states for persistence logic
     tentative_state_history = collections.deque(maxlen=config.STATE_PERSISTENCE_UPDATES)
 
-    while not stop_event.is_set():
-        loop_start_time = time.time()
-        processing_error = False # Flag to track if errors occurred in this iteration
+    try: # Outer try block to catch early exceptions
+        while not stop_event.is_set():
+            logging.debug("***ROO-DEBUG-CHECK*** Processing loop started iteration.") # Loop start debug check
+            loop_start_time = time.time()
+            processing_error = False # Flag to track if errors occurred in this iteration
 
-        try:
-            # 1. Get recent data and baseline metrics from data_store
-            (time_since_last_eeg, time_since_last_ppg, time_since_last_acc,
-             recent_eeg_data, recent_ppg_data, recent_acc_data,
-             current_baseline_metrics) = data_store.get_data_for_processing(
-                 config.EEG_WINDOW_DURATION, config.PPG_WINDOW_DURATION, 3.0 # Placeholder ACC window
-             )
+            try: # Inner try block for main processing logic
+                # 1. Get recent data and baseline metrics from data_store
+                (time_since_last_eeg, time_since_last_ppg, time_since_last_acc,
+                 recent_eeg_data, recent_ppg_data, recent_acc_data,
+                 current_baseline_metrics) = data_store.get_data_for_processing(
+                     config.EEG_WINDOW_DURATION, config.PPG_WINDOW_DURATION, 3.0 # Placeholder ACC window
+                 )
+                logging.debug("Processing loop: Data retrieved from store.")
 
-            # 2. Check for stale data
-            if time_since_last_eeg > config.STALE_DATA_THRESHOLD or \
-               time_since_last_ppg > config.STALE_DATA_THRESHOLD:
-                # Update state directly to Stale if it wasn't already
-                if current_official_state != "Uncertain (Stale Data)":
-                     logging.warning(f"Stale data detected. Last EEG: {time_since_last_eeg:.1f}s, Last PPG: {time_since_last_ppg:.1f}s. Setting state to Uncertain.")
-                     current_official_state = "Uncertain (Stale Data)"
-                     # Clear history when becoming uncertain due to stale data
-                     tentative_state_history.clear()
-                # Send stale state to UI
-                update_data = {"state": current_official_state, "ratio": np.nan, "hr": np.nan, "expression": "N/A", "movement": "N/A"}
+                # 2. Check for stale data
+                if time_since_last_eeg > config.STALE_DATA_THRESHOLD or \
+                   time_since_last_ppg > config.STALE_DATA_THRESHOLD:
+                    # Update state directly to Stale if it wasn't already
+                    if current_official_state != "Uncertain (Stale Data)":
+                         logging.warning(f"Stale data detected. Last EEG: {time_since_last_eeg:.1f}s, Last PPG: {time_since_last_ppg:.1f}s. Setting state to Uncertain.")
+                         current_official_state = "Uncertain (Stale Data)"
+                         # Clear history when becoming uncertain due to stale data
+                         tentative_state_history.clear()
+                    # Send stale state to UI
+                    update_data = {"state": current_official_state, "ratio": np.nan, "hr": np.nan, "expression": "N/A", "movement": "N/A"}
+                    logging.debug("Processing loop: Stale data check complete (Data was stale).")
 
-            else:
-                # 3. Prepare data for feature extraction
-                eeg_data_array = np.array(recent_eeg_data) if recent_eeg_data and all(recent_eeg_data) else None
-                ppg_data_array = np.array(recent_ppg_data) if recent_ppg_data else None
-                # acc_data_array = np.array(recent_acc_data) if recent_acc_data else None # For later use
+                else:
+                    logging.debug("Processing loop: Stale data check complete (Data is fresh).")
+                    # 3. Prepare data for feature extraction
+                    eeg_data_array = np.array(recent_eeg_data) if recent_eeg_data and all(recent_eeg_data) else None
+                    ppg_data_array = np.array(recent_ppg_data) if recent_ppg_data else None
+                    # acc_data_array = np.array(recent_acc_data) if recent_acc_data else None # For later use
+                    logging.debug("Processing loop: Data prepared for feature extraction.")
 
-                if eeg_data_array is None:
-                    logging.debug("Not enough recent EEG data for A/B ratio calculation.")
-                if ppg_data_array is None:
-                    logging.debug("Not enough recent PPG data for HR calculation.")
+                    if eeg_data_array is None:
+                        logging.debug("Not enough recent EEG data for A/B ratio calculation.")
+                    if ppg_data_array is None:
+                        logging.debug("Not enough recent PPG data for HR calculation.")
 
-                # 4. Calculate features
-                # Pass sampling rates from config
-                current_ratio = feature_extraction.extract_alpha_beta_ratio(
-                    eeg_data_array, config.EEG_SAMPLING_RATE
-                ) if eeg_data_array is not None else np.nan
+                    # 4. Calculate features
+                    # Pass sampling rates from config
+                    current_ratio, current_theta = feature_extraction.extract_alpha_beta_ratio(
+                        eeg_data_array, config.EEG_SAMPLING_RATE
+                    ) if eeg_data_array is not None else (np.nan, np.nan)
+                    logging.debug(f"Processing loop: Ratio/Theta calculated: {current_ratio}, {current_theta}")
 
-                current_hr = feature_extraction.estimate_bpm_from_ppg(
-                    ppg_data_array, config.PPG_SAMPLING_RATE
-                ) if ppg_data_array is not None else np.nan
+                    current_hr = feature_extraction.estimate_bpm_from_ppg(
+                        ppg_data_array, config.PPG_SAMPLING_RATE
+                    ) if ppg_data_array is not None else np.nan
+                    logging.debug(f"Processing loop: HR calculated: {current_hr}")
 
-                # Calculate movement metric from recent_acc_data
-                current_movement = feature_extraction.get_movement_metric(
-                    recent_acc_data
-                ) if recent_acc_data is not None else np.nan
-                # Get expression from CV thread/process
-                current_expression = cv_handler.get_current_expression()
+                    # Calculate movement metric from recent_acc_data
+                    current_movement = feature_extraction.get_movement_metric(
+                        recent_acc_data
+                    ) if recent_acc_data is not None else np.nan
+                    logging.debug(f"Processing loop: Movement calculated: {current_movement}")
 
-                # 5. Update stress state using persistence logic
-                current_official_state = state_logic.update_stress_state(
-                    current_ratio, current_hr, current_expression, current_movement,
-                    current_baseline_metrics, current_official_state, tentative_state_history
-                )
+                    # Get expression from CV thread/process
+                    current_expression = cv_handler.get_current_expression()
+                    logging.debug(f"Processing loop: Expression retrieved: {current_expression}")
 
-                # Prepare data for UI
-                update_data = {
-                    "state": current_official_state,
-                    "ratio": current_ratio,
-                    "hr": current_hr,
-                    "expression": current_expression, # Placeholder
-                    "movement": current_movement
-                }
+                    # --- Debugging State Logic Inputs ---
+                    # Log features first, before checking baseline
+                    logging.debug(f"Features: ratio={current_ratio}, hr={current_hr}, theta={current_theta}, movement={current_movement}, expression={current_expression}")
+                    if current_baseline_metrics:
+                        logging.debug(f"***ROO-DEBUG-CHECK*** Baseline Metrics: {current_baseline_metrics}")
 
-            # 6. Send data to the UI queue
-            try:
-                update_queue.put_nowait(update_data)
-            except queue.Full:
-                logging.warning("UI update queue is full. Skipping update.")
+                        # Safely get baseline values, defaulting to NaN
+                        ratio_median = current_baseline_metrics.get('ratio_median', np.nan)
+                        ratio_std = current_baseline_metrics.get('ratio_std', np.nan)
+                        hr_median = current_baseline_metrics.get('hr_median', np.nan)
+                        hr_std = current_baseline_metrics.get('hr_std', np.nan)
+                        movement_median = current_baseline_metrics.get('movement_median', np.nan)
+                        movement_std = current_baseline_metrics.get('movement_std', np.nan)
+                        theta_median = current_baseline_metrics.get('theta_median', np.nan)
+                        theta_std = current_baseline_metrics.get('theta_std', np.nan)
+
+                        # Calculate bounds only if baseline values are valid
+                        ratio_lower_bound = ratio_median - config.RATIO_THRESHOLD * ratio_std if not np.isnan(ratio_median) and not np.isnan(ratio_std) else np.nan
+                        hr_upper_bound = hr_median + config.HR_THRESHOLD * hr_std if not np.isnan(hr_median) and not np.isnan(hr_std) else np.nan
+                        movement_upper_bound = movement_median + config.MOVEMENT_THRESHOLD * movement_std if not np.isnan(movement_median) and not np.isnan(movement_std) else np.nan
+                        theta_upper_bound = theta_median + config.THETA_THRESHOLD * theta_std if not np.isnan(theta_median) and not np.isnan(theta_std) else np.nan
+
+                        # Calculate flags, checking for NaN bounds
+                        is_ratio_low = current_ratio < ratio_lower_bound if not np.isnan(current_ratio) and not np.isnan(ratio_lower_bound) else False
+                        is_hr_high = current_hr > hr_upper_bound if not np.isnan(current_hr) and not np.isnan(hr_upper_bound) else False
+                        is_movement_high = current_movement > movement_upper_bound  if not np.isnan(current_movement) and not np.isnan(movement_upper_bound) else False
+                        is_theta_high = current_theta > theta_upper_bound if not np.isnan(current_theta) and not np.isnan(theta_upper_bound) else False
+
+                        logging.debug(f"Flags: is_ratio_low={is_ratio_low}, is_hr_high={is_hr_high}, is_movement_high={is_movement_high}, is_theta_high={is_theta_high}, expression={current_expression}")
+                    else:
+                        logging.debug("Baseline metrics not yet available for flag calculation.")
+                    # --- End Debugging State Logic Inputs ---
+
+                    # 5. Update stress state using persistence logic
+                    current_official_state = state_logic.update_stress_state(current_ratio, current_hr, current_expression, current_movement, current_theta,
+                        current_baseline_metrics, current_official_state, tentative_state_history)
+                    logging.debug(f"Processing loop: State updated: {current_official_state}")
+
+                    # Prepare data for UI
+                    update_data = {
+                        "state": current_official_state,
+                        "ratio": current_ratio,
+                        "hr": current_hr,
+                        "expression": current_expression,
+                        "movement": current_movement,
+                        "theta": current_theta
+                    }
+
+                # 6. Send data to the UI queue
+                try:
+                    update_queue.put_nowait(update_data)
+                except queue.Full:
+                    logging.warning("UI update queue is full. Skipping update.")
+                    processing_error = True
+
+            except Exception as e:
+                logging.exception(f"Error in processing loop iteration: {e}")
                 processing_error = True
+                # Attempt to recover or wait before next iteration
+                # Don't update UI queue on error
 
-        except Exception as e:
-            logging.exception(f"Error in processing loop iteration: {e}")
-            processing_error = True
-            # Attempt to recover or wait before next iteration
-            # Don't update UI queue on error
+            # 7. Enforce loop timing
+            loop_end_time = time.time()
+            loop_duration = loop_end_time - loop_start_time
+            # Add a small delay even if processing took longer, unless there was an error
+            base_sleep = 0.01 if not processing_error else config.UPDATE_INTERVAL
+            sleep_duration = max(base_sleep, config.UPDATE_INTERVAL - loop_duration)
 
-        # 7. Enforce loop timing
-        loop_end_time = time.time()
-        loop_duration = loop_end_time - loop_start_time
-        # Add a small delay even if processing took longer, unless there was an error
-        base_sleep = 0.01 if not processing_error else config.UPDATE_INTERVAL
-        sleep_duration = max(base_sleep, config.UPDATE_INTERVAL - loop_duration)
+            # Use stop_event.wait for sleeping, allows quicker exit if stop is signaled
+            stop_event.wait(timeout=sleep_duration)
 
-        # Use stop_event.wait for sleeping, allows quicker exit if stop is signaled
-        stop_event.wait(timeout=sleep_duration)
-
-    logging.info("Processing loop stopped.")
+    except Exception as e:
+        logging.exception(f"***ROO-DEBUG-CHECK*** Unhandled exception in processing_loop: {e}")
+    finally:
+        logging.info("Processing loop stopped.")
 
 if __name__ == '__main__':
     # Example usage/test (requires other components like data_store initialized)

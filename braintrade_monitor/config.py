@@ -20,7 +20,7 @@ EEG_FILTER_LOWCUT = 1.0  # EEG filter lowcut frequency (Hz)
 EEG_FILTER_HIGHCUT = 40.0 # EEG filter highcut frequency (Hz)
 ALPHA_BAND = (8, 13)     # Alpha band frequency range (Hz)
 BETA_BAND = (13, 30)     # Beta band frequency range (Hz)
-
+THETA_BAND = (4, 8)       # Theta band frequency range (Hz)
 # PPG Analysis Parameters
 PPG_FILTER_LOWCUT = 0.5  # PPG filter lowcut frequency (Hz)
 PPG_FILTER_HIGHCUT = 4.0 # PPG filter highcut frequency (Hz)
@@ -33,6 +33,7 @@ STALE_DATA_THRESHOLD = 5.0 # Max age for data to be considered fresh (seconds)
 RATIO_THRESHOLD = 1.5      # SD multiplier for ratio threshold
 HR_THRESHOLD = 1.5         # SD multiplier for HR threshold
 MOVEMENT_THRESHOLD = 1.5   # SD multiplier for movement threshold
+THETA_THRESHOLD = 1.5      # SD multiplier for theta threshold
 # General
 NUM_EEG_CHANNELS = 4
 EPSILON = 1e-10            # Small number to avoid division by zero

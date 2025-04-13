@@ -21,6 +21,7 @@ import dashboard_ui
 def main():
     # 1. Setup Logging
     logging_setup.setup_logging()
+    logging.debug("***ROO-DEBUG-CHECK*** Logging configured in main.") # Added debug check
     logging.info("BrainTrade Monitor starting...")
 
     # 2. Argument Parsing (using defaults from config, but allowing overrides)

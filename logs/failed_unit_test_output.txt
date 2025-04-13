@@ -1,0 +1,222 @@
+test_calculate_baseline_insufficient_eeg (test_baseline.TestBaseline.test_calculate_baseline_insufficient_eeg)
+Test baseline failure with insufficient EEG data. ... INFO:root:Initializing data store: EEG(4ch, size=1280), PPG(size=768), ACC(size=100)
+INFO:root:Starting baseline calculation for 1 seconds... Please relax.
+INFO:root:Baseline collection progress: 0.0 / 1s
+INFO:root:Baseline data collection finished. Processing data...
+INFO:root:Processing baseline data. EEG shape: (4, 0), PPG length: 704
+INFO:root:Calculating baseline stats using sliding windows...
+ERROR:root:Error: No valid feature samples calculated during baseline processing. Ratios calculated: 0, HRs calculated: 0
+ok
+test_calculate_baseline_insufficient_ppg (test_baseline.TestBaseline.test_calculate_baseline_insufficient_ppg)
+Test baseline failure with insufficient PPG data. ... INFO:root:Initializing data store: EEG(4ch, size=1280), PPG(size=768), ACC(size=100)
+INFO:root:Starting baseline calculation for 1 seconds... Please relax.
+INFO:root:Baseline collection progress: 0.0 / 1s
+INFO:root:Baseline data collection finished. Processing data...
+INFO:root:Processing baseline data. EEG shape: (4, 1024), PPG length: 256
+INFO:root:Calculating baseline stats using sliding windows...
+ERROR:root:Error: No valid feature samples calculated during baseline processing. Ratios calculated: 3, HRs calculated: 0
+ok
+test_calculate_baseline_nan_features (test_baseline.TestBaseline.test_calculate_baseline_nan_features)
+Test baseline failure when feature extraction returns NaN. ... INFO:root:Initializing data store: EEG(4ch, size=1280), PPG(size=768), ACC(size=100)
+INFO:root:Starting baseline calculation for 1 seconds... Please relax.
+INFO:root:Baseline collection progress: 0.0 / 1s
+INFO:root:Baseline data collection finished. Processing data...
+INFO:root:Processing baseline data. EEG shape: (4, 1280), PPG length: 704
+INFO:root:Calculating baseline stats using sliding windows...
+ERROR
+test_calculate_baseline_success (test_baseline.TestBaseline.test_calculate_baseline_success)
+Test successful baseline calculation with mocked feature extraction. ... INFO:root:Initializing data store: EEG(4ch, size=1280), PPG(size=768), ACC(size=100)
+INFO:root:Starting baseline calculation for 15 seconds... Please relax.
+INFO:root:Baseline collection progress: 0.0 / 15s
+INFO:root:Baseline collection progress: 1.0 / 15s
+INFO:root:Baseline collection progress: 2.0 / 15s
+INFO:root:Baseline collection progress: 3.0 / 15s
+INFO:root:Baseline collection progress: 4.0 / 15s
+INFO:root:Baseline collection progress: 5.0 / 15s
+INFO:root:Baseline collection progress: 6.0 / 15s
+INFO:root:Baseline collection progress: 7.0 / 15s
+INFO:root:Baseline collection progress: 8.0 / 15s
+INFO:root:Baseline collection progress: 9.0 / 15s
+INFO:root:Baseline collection progress: 10.0 / 15s
+INFO:root:Baseline collection progress: 11.0 / 15s
+INFO:root:Baseline collection progress: 12.0 / 15s
+INFO:root:Baseline collection progress: 13.0 / 15s
+INFO:root:Baseline collection progress: 14.0 / 15s
+INFO:root:Baseline data collection finished. Processing data...
+INFO:root:Processing baseline data. EEG shape: (4, 1280), PPG length: 768
+INFO:root:Calculating baseline stats using sliding windows...
+INFO:root:Data Store: Baseline metrics updated: {'ratio_median': 1.5, 'ratio_std': 0.0, 'hr_median': 70.0, 'hr_std': 0.0, 'theta_median': 0.5, 'theta_std': 0.0, 'movement_median': nan, 'movement_std': nan}
+INFO:root:------------------------------
+INFO:root:Baseline Calculation Complete:
+INFO:root:  Baseline A/B Ratio: 1.50 +/- 0.00 (10 samples)
+INFO:root:  Baseline HR: 70.0 +/- 0.0 BPM (5 samples)
+INFO:root:  Baseline Theta Power: 0.50 +/- 0.00 (5 samples)
+INFO:root:------------------------------
+ok
+test_get_current_expression (test_cv_handler.TestCVHandler.test_get_current_expression) ... ok
+test_start_cv_processing_failure (test_cv_handler.TestCVHandler.test_start_cv_processing_failure) ... INFO:root:Starting computer vision loop...
+INFO:root:Computer vision processing started in background.
+ok
+test_start_cv_processing_success (test_cv_handler.TestCVHandler.test_start_cv_processing_success) ... INFO:root:Starting computer vision loop...
+INFO:root:Computer vision processing started in background.
+ok
+test_add_acc_data_valid (test_data_store.TestDataStore.test_add_acc_data_valid)
+Test adding valid ACC data. ... INFO:root:Initializing data store: EEG(4ch, size=2560), PPG(size=960), ACC(size=500)
+ok
+test_add_eeg_data_buffer_limit (test_data_store.TestDataStore.test_add_eeg_data_buffer_limit)
+Test EEG buffer respects maxlen using public add function. ... INFO:root:Initializing data store: EEG(4ch, size=2560), PPG(size=960), ACC(size=500)
+ok
+test_add_eeg_data_invalid_length (test_data_store.TestDataStore.test_add_eeg_data_invalid_length)
+Test adding EEG data with incorrect channel count. ... INFO:root:Initializing data store: EEG(4ch, size=2560), PPG(size=960), ACC(size=500)
+WARNING:root:Mismatch EEG channels. Expected 4, got 3. Discarding.
+ok
+test_add_eeg_data_valid (test_data_store.TestDataStore.test_add_eeg_data_valid)
+Test adding valid EEG data and check via retrieval and timestamp. ... INFO:root:Initializing data store: EEG(4ch, size=2560), PPG(size=960), ACC(size=500)
+ok
+test_add_ppg_data_valid (test_data_store.TestDataStore.test_add_ppg_data_valid)
+Test adding valid PPG data. ... INFO:root:Initializing data store: EEG(4ch, size=2560), PPG(size=960), ACC(size=500)
+ok
+test_get_all_data_for_baseline (test_data_store.TestDataStore.test_get_all_data_for_baseline)
+Test retrieving all data for baseline. ... INFO:root:Initializing data store: EEG(4ch, size=2560), PPG(size=960), ACC(size=500)
+ok
+test_get_data_for_processing_empty (test_data_store.TestDataStore.test_get_data_for_processing_empty)
+Test getting data when buffers are empty. ... INFO:root:Initializing data store: EEG(4ch, size=2560), PPG(size=960), ACC(size=500)
+ok
+test_get_data_for_processing_windowing (test_data_store.TestDataStore.test_get_data_for_processing_windowing)
+Test if data retrieval respects time windows with sufficient buffer. ... INFO:root:Initializing data store: EEG(4ch, size=2560), PPG(size=960), ACC(size=500)
+ok
+test_initialization (test_data_store.TestDataStore.test_initialization)
+Test if data store initializes correctly by checking state via functions. ... INFO:root:Initializing data store: EEG(4ch, size=2560), PPG(size=960), ACC(size=500)
+ok
+test_set_get_baseline_metrics (test_data_store.TestDataStore.test_set_get_baseline_metrics)
+Test setting and getting baseline metrics. ... INFO:root:Initializing data store: EEG(4ch, size=2560), PPG(size=960), ACC(size=500)
+INFO:root:Data Store: Baseline metrics updated: {'hr_median': 75.0, 'hr_std': 4.0}
+INFO:root:Data Store: Baseline metrics updated: {'ratio_median': 1.2, 'ratio_std': 0.3}
+ok
+test_estimate_bpm_from_ppg_clean_sine (test_feature_extraction.TestFeatureExtraction.test_estimate_bpm_from_ppg_clean_sine)
+Test BPM estimation with a clean sine wave. ... ok
+test_estimate_bpm_from_ppg_insufficient_data (test_feature_extraction.TestFeatureExtraction.test_estimate_bpm_from_ppg_insufficient_data)
+Test BPM estimation with insufficient data length. ... ok
+test_estimate_bpm_from_ppg_no_peaks (test_feature_extraction.TestFeatureExtraction.test_estimate_bpm_from_ppg_no_peaks)
+Test BPM estimation with flat signal (no peaks). ... ok
+test_estimate_bpm_from_ppg_noisy (test_feature_extraction.TestFeatureExtraction.test_estimate_bpm_from_ppg_noisy)
+Test BPM estimation with added noise. ... ok
+test_extract_alpha_beta_ratio_alpha_dominant (test_feature_extraction.TestFeatureExtraction.test_extract_alpha_beta_ratio_alpha_dominant)
+Test ratio when alpha power is dominant. ... ok
+test_extract_alpha_beta_ratio_beta_dominant (test_feature_extraction.TestFeatureExtraction.test_extract_alpha_beta_ratio_beta_dominant)
+Test ratio when beta power is dominant. ... ok
+test_extract_alpha_beta_ratio_insufficient_data (test_feature_extraction.TestFeatureExtraction.test_extract_alpha_beta_ratio_insufficient_data)
+Test ratio calculation with insufficient data length. ... ERROR
+test_extract_alpha_beta_ratio_nan_input (test_feature_extraction.TestFeatureExtraction.test_extract_alpha_beta_ratio_nan_input)
+Test ratio calculation with NaN input data. ... WARNING:root:NaNs detected in filtered EEG data for channel 0, skipping PSD calculation.
+ERROR
+test_extract_alpha_beta_ratio_noisy (test_feature_extraction.TestFeatureExtraction.test_extract_alpha_beta_ratio_noisy)
+Test ratio calculation with significant noise. ... ok
+test_full_queue_handling (test_processing.TestProcessingLoop.test_full_queue_handling)
+Test loop behavior when the UI queue is full. ... INFO:root:Starting real-time processing loop...
+WARNING:root:UI update queue is full. Skipping update.
+INFO:root:Processing loop stopped.
+ok
+test_nan_feature_handling (test_processing.TestProcessingLoop.test_nan_feature_handling)
+Test loop behavior when feature extraction returns NaN. ... INFO:root:Starting real-time processing loop...
+ERROR:root:Error in processing loop iteration: cannot unpack non-iterable float object
+Traceback (most recent call last):
+  File "/Users/walnuts/Documents/repo/Python/braintrade/braintrade_monitor/processing.py", line 66, in processing_loop
+    current_ratio, current_theta = feature_extraction.extract_alpha_beta_ratio(
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: cannot unpack non-iterable float object
+INFO:root:Processing loop stopped.
+FAIL
+test_normal_processing_flow (test_processing.TestProcessingLoop.test_normal_processing_flow)
+Test one iteration of the loop with valid data. ... INFO:root:Starting real-time processing loop...
+INFO:root:Processing loop stopped.
+ok
+test_stale_data_handling (test_processing.TestProcessingLoop.test_stale_data_handling)
+Test loop behavior when data is stale. ... INFO:root:Starting real-time processing loop...
+WARNING:root:Stale data detected. Last EEG: 6.0s, Last PPG: 0.1s. Setting state to Uncertain.
+INFO:root:Processing loop stopped.
+ok
+test_initial_state_calm (test_state_logic.TestStateLogic.test_initial_state_calm)
+Test correct tentative state for calm inputs. ... ok
+test_initial_state_stress (test_state_logic.TestStateLogic.test_initial_state_stress)
+Test correct tentative state for stress inputs. ... ok
+test_initial_state_warning_hr (test_state_logic.TestStateLogic.test_initial_state_warning_hr)
+Test correct tentative state for warning (high HR). ... ok
+test_initial_state_warning_ratio (test_state_logic.TestStateLogic.test_initial_state_warning_ratio)
+Test correct tentative state for warning (low ratio). ... ok
+test_persistence_change_to_calm (test_state_logic.TestStateLogic.test_persistence_change_to_calm)
+Test state change to Calm after persistent tentative states. ... INFO:root:STATE CHANGE: Warning -> Calm/Focused
+ok
+test_persistence_change_to_stress (test_state_logic.TestStateLogic.test_persistence_change_to_stress)
+Test state change to Stress after persistent tentative states. ... INFO:root:STATE CHANGE: Calm -> Stress/Tilted
+ok
+test_persistence_change_to_uncertain_nan (test_state_logic.TestStateLogic.test_persistence_change_to_uncertain_nan)
+Test state change to Uncertain (NaN) after persistent NaN inputs. ... INFO:root:STATE CHANGE: Calm -> Uncertain (NaN)
+ok
+test_persistence_change_to_warning (test_state_logic.TestStateLogic.test_persistence_change_to_warning)
+Test state change to Warning after persistent tentative states. ... INFO:root:STATE CHANGE: Calm -> Warning
+ok
+test_persistence_no_change_mixed_states (test_state_logic.TestStateLogic.test_persistence_no_change_mixed_states)
+Test state does not change with mixed tentative states in history. ... ok
+test_state_missing_baseline (test_state_logic.TestStateLogic.test_state_missing_baseline)
+Test handling of missing baseline metrics. ... WARNING:root:Baseline metrics not available, cannot determine state.
+ok
+test_state_nan_input (test_state_logic.TestStateLogic.test_state_nan_input)
+Test handling of NaN input. ... ok
+
+======================================================================
+ERROR: test_calculate_baseline_nan_features (test_baseline.TestBaseline.test_calculate_baseline_nan_features)
+Test baseline failure when feature extraction returns NaN.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/unittest/mock.py", line 1375, in patched
+    return func(*newargs, **newkeywargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/walnuts/Documents/repo/Python/braintrade/tests/test_baseline.py", line 135, in test_calculate_baseline_nan_features
+    success = baseline.calculate_baseline(duration_seconds=1)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/walnuts/Documents/repo/Python/braintrade/braintrade_monitor/baseline.py", line 71, in calculate_baseline
+    ratio, theta = feature_extraction.extract_alpha_beta_ratio(eeg_window, config.EEG_SAMPLING_RATE)
+    ^^^^^^^^^^^^
+TypeError: cannot unpack non-iterable float object
+
+======================================================================
+ERROR: test_extract_alpha_beta_ratio_insufficient_data (test_feature_extraction.TestFeatureExtraction.test_extract_alpha_beta_ratio_insufficient_data)
+Test ratio calculation with insufficient data length.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/walnuts/Documents/repo/Python/braintrade/tests/test_feature_extraction.py", line 117, in test_extract_alpha_beta_ratio_insufficient_data
+    self.assertTrue(np.isnan(result), "Result should be NaN for insufficient data")
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/unittest/case.py", line 713, in assertTrue
+    if not expr:
+ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+
+======================================================================
+ERROR: test_extract_alpha_beta_ratio_nan_input (test_feature_extraction.TestFeatureExtraction.test_extract_alpha_beta_ratio_nan_input)
+Test ratio calculation with NaN input data.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/walnuts/Documents/repo/Python/braintrade/tests/test_feature_extraction.py", line 127, in test_extract_alpha_beta_ratio_nan_input
+    self.assertTrue(np.isnan(result), "Result should be NaN when input has NaNs")
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/unittest/case.py", line 713, in assertTrue
+    if not expr:
+ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+
+======================================================================
+FAIL: test_nan_feature_handling (test_processing.TestProcessingLoop.test_nan_feature_handling)
+Test loop behavior when feature extraction returns NaN.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/unittest/mock.py", line 1375, in patched
+    return func(*newargs, **newkeywargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/walnuts/Documents/repo/Python/braintrade/tests/test_processing.py", line 120, in test_nan_feature_handling
+    mock_feature_extraction.estimate_bpm_from_ppg.assert_called_once()
+  File "/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/unittest/mock.py", line 918, in assert_called_once
+    raise AssertionError(msg)
+AssertionError: Expected 'estimate_bpm_from_ppg' to have been called once. Called 0 times.
+
+----------------------------------------------------------------------
+Ran 41 tests in 18.470s
+
+FAILED (failures=1, errors=3)

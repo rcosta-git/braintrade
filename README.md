@@ -16,9 +16,9 @@ The system uses a multi-phase approach, starting with basic physiological indica
 
 See `docs/braintrade_monitor_plan.md` for the overall roadmap and individual `docs/phaseX_*.md` files for detailed plans.
 
-## Current Status (Phase 2 Complete)
+## Current Status (Phase 3 In Progress)
 
-Phase 2 is now complete. The core logic for the stress monitor is now refactored into the `braintrade_monitor` Python package. The main script is now `main.py`. The system performs real-time stress monitoring based on EEG Alpha/Beta ratio, PPG-derived heart rate, accelerometer data, and facial expressions. A basic `tkinter` UI is implemented. The team is currently working on getting the unit tests to pass.
+Phase 2 is now complete. Phase 3 is in progress, focusing on adding focus and fatigue detection using EEG Theta band analysis and EEG artifact detection for blink detection. The core logic for the stress monitor is now refactored into the `braintrade_monitor` Python package. The main script is now `main.py`. The system performs real-time stress monitoring based on EEG Alpha/Beta ratio, PPG-derived heart rate, accelerometer data, and facial expressions. A basic `tkinter` UI is implemented. The team is currently working on getting the unit tests to pass.
 
 *   **Modular Codebase:** Core logic refactored into the `braintrade_monitor` package for better organization and maintainability.
 *   **Unit Tests:** Unit tests added for `feature_extraction`, `state_logic`, `data_store`, and `baseline` modules. The team is currently working on getting the unit tests to pass.

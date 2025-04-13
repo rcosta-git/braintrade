@@ -22,8 +22,8 @@
 
 *   **ACC Integration:** Successfully integrated accelerometer data for movement detection.
 
-### Known Issues
-*   **Computer Vision Issues:** Encountered dependency and initialization issues with the `FER` library for facial expression detection. Further investigation and troubleshooting are required.
+### Status
+*   **Phase 3 In Progress:** Started implementing Phase 3, focusing on adding focus and fatigue detection using EEG Theta band analysis and EEG artifact detection for blink detection.
 
 ---
 ## [Unreleased] - 2025-04-12 (Late Evening - Phase 1 Completion & Debugging)

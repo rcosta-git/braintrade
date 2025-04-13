@@ -42,7 +42,7 @@ def add_eeg_data(eeg_sample):
     ts = time.time()
     with _data_lock:
         # logging.debug(f"Data Store: Attempting to add EEG sample. Buffer exists: {_eeg_data_buffers is not None}, Sample len: {len(eeg_sample)}, Expected channels: {_num_eeg_channels}") # DEBUG LOG - Commented out for less verbosity
-        if _eeg_data_buffers is not None and len(eeg_sample) == _num_eeg_channels:
+        if _eeg_data_buffers is not None and len(eeg_sample) >= _num_eeg_channels:
             try:
                 for i in range(_num_eeg_channels):
                     _eeg_data_buffers[i].append((ts, float(eeg_sample[i])))
@@ -100,7 +100,9 @@ def get_data_for_processing(eeg_window_duration, ppg_window_duration, acc_window
     ppg_window_start_time = now - ppg_window_duration
     acc_window_start_time = now - acc_window_duration
 
+    logging.debug("get_data_for_processing: Attempting to acquire lock...")
     with _data_lock:
+        logging.debug("get_data_for_processing: Lock acquired.")
         # Make copies under the lock to minimize lock holding time
         time_since_last_eeg = now - _last_eeg_timestamp if _last_eeg_timestamp > 0 else float('inf')
         time_since_last_ppg = now - _last_ppg_timestamp if _last_ppg_timestamp > 0 else float('inf')
@@ -131,11 +133,17 @@ def get_data_for_processing(eeg_window_duration, ppg_window_duration, acc_window
 
         # Copy baseline metrics
         current_baseline_metrics = _baseline_metrics.copy()
+        logging.debug(f"get_data_for_processing: EEG bufs exist={_eeg_data_buffers is not None}, PPG buf exists={_ppg_data_buffer is not None}, ACC buf exists={_acc_data_buffer is not None}")
+        logging.debug(f"get_data_for_processing: Baseline metrics copied: {current_baseline_metrics}")
+
+    # Log lengths before returning
+    logging.debug(f"get_data_for_processing: Returning EEG len={len(recent_eeg_data[0]) if recent_eeg_data else 'None'}, PPG len={len(recent_ppg_data) if recent_ppg_data else 'None'}, ACC len={len(recent_acc_data) if recent_acc_data else 'None'}")
 
     # Return copies of data and timestamps
     return (time_since_last_eeg, time_since_last_ppg, time_since_last_acc,
-            recent_eeg_data, recent_ppg_data, recent_acc_data,
+            recent_eeg_data, recent_ppg_data, recent_acc_data, # Note: recent_eeg_data is list of lists here
             current_baseline_metrics)
+    logging.debug("get_data_for_processing: Lock released.")
 
 def get_all_data_for_baseline():
     """Retrieves all currently buffered data (values only) for baseline calculation."""
@@ -164,7 +172,7 @@ def set_baseline_metrics(metrics_dict):
     """Updates the stored baseline metrics."""
     with _data_lock:
         _baseline_metrics.update(metrics_dict)
-        logging.info(f"Baseline metrics updated: {metrics_dict}")
+        logging.info(f"Data Store: Baseline metrics updated: {metrics_dict}")
 
 def get_baseline_metrics():
     """Returns a copy of the current baseline metrics."""

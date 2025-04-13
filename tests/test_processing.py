@@ -46,7 +46,7 @@ class TestProcessingLoop(unittest.TestCase):
             return return_value
 
         mock_data_store.get_data_for_processing.side_effect = get_data_side_effect
-        mock_feature_extraction.extract_alpha_beta_ratio.return_value = 1.8
+        mock_feature_extraction.extract_alpha_beta_ratio.return_value = (1.8, 0.6) # Return tuple (ratio, theta)
         mock_feature_extraction.estimate_bpm_from_ppg.return_value = 65.0
         mock_state_logic.update_stress_state.return_value = "Calm"
 
@@ -103,6 +103,7 @@ class TestProcessingLoop(unittest.TestCase):
              return return_value
         mock_data_store.get_data_for_processing.side_effect = get_data_side_effect
 
+        # Function returns single NaN on internal failure
         mock_feature_extraction.extract_alpha_beta_ratio.return_value = np.nan
         mock_feature_extraction.estimate_bpm_from_ppg.return_value = 65.0
         mock_state_logic.update_stress_state.return_value = "Uncertain (NaN)"
@@ -139,7 +140,7 @@ class TestProcessingLoop(unittest.TestCase):
              return return_value
         mock_data_store.get_data_for_processing.side_effect = get_data_side_effect
 
-        mock_feature_extraction.extract_alpha_beta_ratio.return_value = 1.8
+        mock_feature_extraction.extract_alpha_beta_ratio.return_value = (1.8, 0.6) # Return tuple (ratio, theta)
         mock_feature_extraction.estimate_bpm_from_ppg.return_value = 65.0
         mock_state_logic.update_stress_state.return_value = "Calm"
 

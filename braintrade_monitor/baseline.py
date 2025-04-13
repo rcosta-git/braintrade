@@ -33,7 +33,7 @@ def calculate_baseline(duration_seconds):
 
     # Retrieve all collected data from the data store
     eeg_baseline_data, ppg_baseline_data, acc_baseline_data = data_store.get_all_data_for_baseline()
-    # We ignore acc_baseline_data for now
+    # ACC data is now processed
 
     # --- Data Validation ---
     min_eeg_samples = int(config.EEG_SAMPLING_RATE * config.EEG_WINDOW_DURATION)
@@ -57,6 +57,7 @@ def calculate_baseline(duration_seconds):
     # --- Feature Calculation over Sliding Windows ---
     ratios = []
     hrs = []
+    thetas = [] # Initialize thetas list
     eeg_window_samples = int(config.EEG_SAMPLING_RATE * config.EEG_WINDOW_DURATION)
     ppg_window_samples = int(config.PPG_SAMPLING_RATE * config.PPG_WINDOW_DURATION)
     # Use a step size related to the update interval for consistency
@@ -68,9 +69,10 @@ def calculate_baseline(duration_seconds):
     for i in range(0, eeg_baseline_data.shape[1] - eeg_window_samples + 1, step_samples_eeg):
         eeg_window = eeg_baseline_data[:, i:i+eeg_window_samples]
         # Pass sampling rate directly from config
-        ratio = feature_extraction.extract_alpha_beta_ratio(eeg_window, config.EEG_SAMPLING_RATE)
-        if not np.isnan(ratio):
+        ratio, theta = feature_extraction.extract_alpha_beta_ratio(eeg_window, config.EEG_SAMPLING_RATE)
+        if not np.isnan(ratio) and not np.isnan(theta):
             ratios.append(ratio)
+            thetas.append(theta) # Append theta here
 
     # PPG HR Calculation
     for i in range(0, len(ppg_baseline_data) - ppg_window_samples + 1, step_samples_ppg):
@@ -80,27 +82,68 @@ def calculate_baseline(duration_seconds):
         if not np.isnan(hr):
             hrs.append(hr)
 
+    # ACC Movement Calculation
+    movements = []
+    # Define ACC window and step based on assumed sampling rate (e.g., 50Hz) and duration
+    # TODO: Get ACC sampling rate from config or data source if possible
+    acc_sampling_rate = 50 # Assume 50Hz for now
+    acc_window_duration = 3 # seconds, match processing loop expectation
+    acc_window_samples = int(acc_sampling_rate * acc_window_duration)
+    step_samples_acc = int(acc_sampling_rate * config.UPDATE_INTERVAL)
+
+    if len(acc_baseline_data) >= acc_window_samples:
+        for i in range(0, len(acc_baseline_data) - acc_window_samples + 1, step_samples_acc):
+            acc_window = acc_baseline_data[i:i+acc_window_samples]
+            # Pass sampling rate directly from config (or assumed value)
+            movement = feature_extraction.get_movement_metric(acc_window)
+            if not np.isnan(movement):
+                movements.append(movement)
+                logging.debug(f"Baseline movement sample {len(movements)}: {movement:.4f}") # Add debug log for each movement value
+    else:
+        logging.warning(f"Insufficient ACC data for baseline movement calculation. Collected: {len(acc_baseline_data)}, Required: {acc_window_samples}")
+
     # --- Store Results ---
-    if not ratios or not hrs:
-        logging.error(f"Error: No valid feature samples calculated during baseline processing. "
-                      f"Ratios calculated: {len(ratios)}, HRs calculated: {len(hrs)}")
+    # --- Store Results ---
+    # Check if enough samples were collected for *all* metrics needed
+    if not ratios or not hrs or not thetas or not movements:
+        logging.error(f"Error: Not enough valid feature samples calculated during baseline. "
+                      f"Ratios: {len(ratios)}, HRs: {len(hrs)}, Thetas: {len(thetas)}, Movements: {len(movements)}")
+        # Store whatever was calculated, but return False
+        calculated_metrics = {
+            'ratio_median': np.median(ratios) if ratios else np.nan,
+            'ratio_std': np.std(ratios) if ratios else np.nan,
+            'hr_median': np.median(hrs) if hrs else np.nan,
+            'hr_std': np.std(hrs) if hrs else np.nan,
+            'theta_median': np.median(thetas) if thetas else np.nan,
+            'theta_std': np.std(thetas) if thetas else np.nan,
+            'movement_median': np.median(movements) if movements else np.nan,
+            'movement_std': np.std(movements) if movements else np.nan
+        }
+        data_store.set_baseline_metrics(calculated_metrics) # Store partial/NaN results
         return False
 
+# Remove the redundant second EEG loop
+    # All metrics have sufficient samples, calculate and store final values
     calculated_metrics = {
         'ratio_median': np.median(ratios),
         'ratio_std': np.std(ratios),
         'hr_median': np.median(hrs),
         'hr_std': np.std(hrs),
-        'movement_median': np.nan, # Placeholder
-        'movement_std': np.nan # Placeholder
+        'theta_median': np.median(thetas),
+        'theta_std': np.std(thetas),
+        'movement_median': np.median(movements),
+        'movement_std': np.std(movements)
     }
 
+    # Store the final, valid baseline metrics
     data_store.set_baseline_metrics(calculated_metrics)
 
     logging.info("-" * 30)
     logging.info("Baseline Calculation Complete:")
     logging.info(f"  Baseline A/B Ratio: {calculated_metrics['ratio_median']:.2f} +/- {calculated_metrics['ratio_std']:.2f} ({len(ratios)} samples)")
     logging.info(f"  Baseline HR: {calculated_metrics['hr_median']:.1f} +/- {calculated_metrics['hr_std']:.1f} BPM ({len(hrs)} samples)")
+    logging.info(f"  Baseline Theta Power: {calculated_metrics.get('theta_median', np.nan):.2f} +/- {calculated_metrics.get('theta_std', np.nan):.2f} ({len(thetas)} samples)")
+    logging.info(f"  Baseline Movement: {calculated_metrics.get('movement_median', np.nan):.4f} +/- {calculated_metrics.get('movement_std', np.nan):.4f} ({len(movements)} samples)")
     logging.info("-" * 30)
     return True
 

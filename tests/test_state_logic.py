@@ -18,7 +18,8 @@ class TestStateLogic(unittest.TestCase):
         self.baseline_metrics = {
             'ratio_median': 1.5, 'ratio_std': 0.2, # Lower threshold = 1.5 - 1.5*0.2 = 1.2
             'hr_median': 70, 'hr_std': 5,          # Upper threshold = 70 + 1.5*5 = 77.5
-            'movement_median': 1.0, 'movement_std': 0.1
+            'movement_median': 1.0, 'movement_std': 0.1,
+            'theta_median': 0.5, 'theta_std': 0.1 # Added for Phase 3
         }
         # Persistence window size from config
         self.persistence = config.STATE_PERSISTENCE_UPDATES
@@ -29,8 +30,7 @@ class TestStateLogic(unittest.TestCase):
         """Helper to run multiple updates and return the final state."""
         final_state = self.current_state
         for ratio, hr, expression in inputs:
-            final_state = state_logic.update_stress_state(
-                ratio, hr, expression, 0.0, self.baseline_metrics, final_state, self.history)
+            final_state = state_logic.update_stress_state(ratio, hr, expression, 0.0, 0.0, self.baseline_metrics, final_state, self.history)
             self.current_state = final_state
         return final_state
     def test_initial_state_calm(self):
@@ -72,7 +72,7 @@ class TestStateLogic(unittest.TestCase):
 
     def test_state_missing_baseline(self):
         """Test handling of missing baseline metrics."""
-        state = state_logic.update_stress_state(1.5, 70, "Neutral", 0.0, {}, self.current_state, self.history)
+        state = state_logic.update_stress_state(1.5, 70, "Neutral", 0.0, 0.0, {}, self.current_state, self.history)
         self.assertEqual(self.history[-1], "Initializing")
         self.assertEqual(state, "Initializing")
 

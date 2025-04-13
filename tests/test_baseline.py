@@ -54,10 +54,10 @@ class TestBaseline(unittest.TestCase):
     # Use patch to mock the feature extraction functions during the test
     @patch('braintrade_monitor.feature_extraction.extract_alpha_beta_ratio')
     @patch('braintrade_monitor.feature_extraction.estimate_bpm_from_ppg')
-    def test_calculate_baseline_success(self, mock_estimate_bpm, mock_extract_ratio):
+    def test_calculate_baseline_success(self, mock_estimate_bpm, mock_extract_ratio): # Swapped args to match decorator order
         """Test successful baseline calculation with mocked feature extraction."""
         # Configure mocks to return consistent values
-        mock_extract_ratio.return_value = 1.5  # Example ratio
+        mock_extract_ratio.return_value = (1.5, 0.5)  # Example ratio and theta
         mock_estimate_bpm.return_value = 70.0  # Example HR
 
         # Populate enough data (must be >= longest window duration used in check, which is PPG)
@@ -86,8 +86,10 @@ class TestBaseline(unittest.TestCase):
         self.assertIn('hr_std', metrics)
         self.assertAlmostEqual(metrics['ratio_median'], 1.5)
         self.assertAlmostEqual(metrics['hr_median'], 70.0)
+        self.assertAlmostEqual(metrics['theta_median'], 0.5)
         self.assertEqual(metrics['ratio_std'], 0.0) # Std should be 0 if mock always returns same value
         self.assertEqual(metrics['hr_std'], 0.0)
+        self.assertEqual(metrics['theta_std'], 0.0)
 
     def test_calculate_baseline_insufficient_eeg(self):
         """Test baseline failure with insufficient EEG data."""
@@ -123,9 +125,9 @@ class TestBaseline(unittest.TestCase):
 
     @patch('braintrade_monitor.feature_extraction.extract_alpha_beta_ratio')
     @patch('braintrade_monitor.feature_extraction.estimate_bpm_from_ppg')
-    def test_calculate_baseline_nan_features(self, mock_estimate_bpm, mock_extract_ratio):
+    def test_calculate_baseline_nan_features(self, mock_extract_ratio, mock_estimate_bpm): # Swapped args to match decorator order
         """Test baseline failure when feature extraction returns NaN."""
-        mock_extract_ratio.return_value = np.nan
+        mock_extract_ratio.return_value = (np.nan, np.nan)
         mock_estimate_bpm.return_value = np.nan
 
         self._populate_data(num_seconds=max(config.EEG_WINDOW_DURATION, config.PPG_WINDOW_DURATION) + 1)
