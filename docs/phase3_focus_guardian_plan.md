@@ -5,7 +5,7 @@
 
 **Objective:** Enhance the monitor by adding detection for loss of focus or drowsiness, primarily using EEG Theta band analysis and blink detection (either via CV or EEG).
 
-**Core Script:** Continue modifying `stress_monitor.py` (or refactor).
+**Core Modules:** Modifications primarily affect `braintrade_monitor/feature_extraction.py`, `braintrade_monitor/baseline.py`, `braintrade_monitor/state_logic.py`, `braintrade_monitor/data_store.py`, and `dashboard_ui.py`.
 
 **1. Enhanced EEG Analysis (Refined):**
     *   **Goal:** Extract features relevant to focus, drowsiness, and cognitive load.
@@ -18,22 +18,17 @@
 
 **2. Blink Detection (Refined Strategy):**
     *   **Goal:** Estimate blink rate as an indicator of fatigue/drowsiness.
-    *   **Method Choice Strategy:**
-        *   **Primary Approach (if feasible): Computer Vision (Eye Aspect Ratio - EAR)**
-            *   *Condition:* Requires reliable facial landmark detection, especially eye landmarks, from the CV implementation in Phase 2 (e.g., using `dlib`, `mediapipe` backend in `deepface`, or similar).
-            *   *Library:* Leverage the chosen Phase 2 CV library's landmark output. Use `scipy.spatial.distance` to calculate distances needed for EAR.
-            *   *Logic:* Calculate EAR for each frame. Detect blinks when EAR drops below a tuned threshold for a minimum number of frames. Calculate blink rate (blinks per minute) over a rolling window (e.g., 30-60 seconds).
-            *   *Pros:* Direct measure of eye closure. Leverages existing CV pipeline if landmarks are available.
-            *   *Cons:* Dependent on reliable landmark tracking; sensitive to pose, lighting, occlusions.
-        *   **Fallback Approach: EEG Artifact Detection**
-            *   *Condition:* Use if CV landmarks are unavailable or unreliable.
-            *   *Signal:* Use raw EEG data buffers (frontal channels preferred: AF7/AF8 if mapped, otherwise TP9/TP10 or average).
-            *   *Logic:* Apply bandpass filter (e.g., 1-10 Hz). Implement a peak detection algorithm (`scipy.signal.find_peaks` or custom thresholding) tuned to identify large-amplitude, sharp deflections typical of blink artifacts. Calculate blink rate over a rolling window.
-            *   *Pros:* Uses existing EEG stream. Less sensitive to camera issues.
-            *   *Cons:* Indirect measure; prone to false positives from EMG/movement; requires careful filter/threshold tuning per user.
-        *   **Simplification:** If both above are too complex/unreliable, consider a simpler CV metric like "% time eyes closed" over a window.
+    *   **Chosen Method: EEG Artifact Detection**
+        *   *Reasoning:* The current CV library (`fer`) is unlikely to provide the stable eye landmarks needed for the CV EAR method. EEG artifact detection leverages the existing data stream and avoids major changes to the CV component.
+        *   *Signal:* Use raw EEG data buffers from `data_store.py` (frontal channels preferred: AF7/AF8 if mapping confirmed, otherwise TP9/TP10 or average).
+        *   *Logic (in `feature_extraction.py`):*
+            *   Apply a bandpass filter (e.g., 1-10 Hz) to the relevant EEG channel(s).
+            *   Implement a peak detection algorithm (`scipy.signal.find_peaks` or custom thresholding) tuned to identify large-amplitude, sharp deflections typical of blink artifacts.
+            *   Calculate blink rate (blinks per minute) over a rolling window (e.g., 30-60 seconds).
+        *   *Pros:* Uses existing EEG stream. Less sensitive to camera issues. Doesn't require changing CV library.
+        *   *Cons:* Indirect measure; prone to false positives from EMG/movement; requires careful filter/threshold tuning per user.
     *   **Implementation:**
-        *   Implement the chosen blink detection logic (prioritizing CV EAR).
+        *   Implement the EEG artifact detection logic in `feature_extraction.py`.
         *   Calculate rolling blink rate (`current_blink_rate`).
         *   Calculate baseline blink rate (`baseline_blink_rate_median`, `baseline_blink_rate_std`) during calibration.
 
@@ -60,14 +55,13 @@
     *   Add indicators for Theta Power/Ratio, Blink Rate, and the new "Drowsy/Distracted" state to the chosen UI (Tkinter/Rich).
 
 **5. Key Libraries (Additions/Considerations):**
-    *   Potentially `dlib` or `mediapipe` (if using CV EAR blink detection and not already added in Phase 2).
-    *   `scipy.spatial` (for EAR calculation if using CV).
+    *   `scipy.signal` (already likely used, confirm for peak detection).
 
 **6. Implementation Steps:**
-    *   Modify `get_band_powers` to include Theta.
-    *   Add Theta baseline calculation.
-    *   Implement chosen Blink Detection method (CV or EEG).
-    *   Add blink rate baseline calculation.
-    *   Refine state logic rules significantly to incorporate new inputs and states.
-    *   Update UI dashboard.
+    *   Modify `extract_alpha_beta_ratio` (in `feature_extraction.py`) to also calculate and return Theta power/ratios.
+    *   Add Theta baseline calculation logic to `baseline.py` and update `data_store.py` to store/retrieve these metrics.
+    *   Implement EEG Blink Detection method in `feature_extraction.py`.
+    *   Add blink rate baseline calculation logic to `baseline.py` and update `data_store.py`.
+    *   Refine state logic rules in `state_logic.py` to incorporate new inputs and the 'Drowsy/Distracted' state.
+    *   Update UI elements and update logic in `dashboard_ui.py`.
     *   Test and tune thresholds for Theta and Blink Rate.
