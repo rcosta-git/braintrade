@@ -168,8 +168,10 @@ def processing_loop(
                     # --- End Debugging State Logic Inputs ---
 
                     # 5. Update stress state using persistence logic
-                    new_state, suggested_position, confidence_level = state_logic.update_stress_state(current_ratio, current_hr, current_expression, current_movement, current_theta, current_trend,
-                        final_baseline_metrics, current_official_state, tentative_state_history)
+                    # Pass shared_state_dict which contains both baseline metrics and market_trend
+                    new_state, suggested_position, confidence_level = state_logic.update_stress_state(current_ratio, current_hr, current_expression, current_movement, current_theta,
+                        shared_state_dict, current_official_state, tentative_state_history) # Removed current_trend, passed shared_state_dict
+                    current_official_state = new_state # Update the loop's state variable for the next iteration's persistence check
                     # logging.debug(f"Processing loop: State updated: {current_official_state}") # Commented out - state is logged below
 
                     # Store suggestion data
