@@ -176,3 +176,13 @@ def check_buffers_initialized():
     """Checks if data buffers have been initialized."""
     with _data_lock:
         return _eeg_data_buffers is not None and _ppg_data_buffer is not None # Add ACC check if needed
+
+# --- Timestamp Getters ---
+def get_last_timestamps():
+    """Returns the last received timestamps for all data types."""
+    with _data_lock:
+        return {
+            "eeg": _last_eeg_timestamp,
+            "ppg": _last_ppg_timestamp,
+            "acc": _last_acc_timestamp
+        }

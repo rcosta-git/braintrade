@@ -117,6 +117,12 @@ def extract_alpha_beta_ratio(eeg_data, sampling_rate):
 
     for j in range(n_channels):
         channel_data = eeg_filtered[j, :]
+        # Check for NaNs after filtering, before PSD calculation
+        if np.isnan(channel_data).any():
+            logging.warning(f"NaNs detected in filtered EEG data for channel {j}, skipping PSD calculation.")
+            band_powers['Alpha'][j] = np.nan
+            band_powers['Beta'][j] = np.nan
+            continue
         n_times_ch = len(channel_data)
         # Ensure n_fft is not greater than the channel data length after potential filtering artifacts
         n_fft = min(n_times_ch, config.EEG_NFFT)
