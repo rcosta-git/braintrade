@@ -1,9 +1,8 @@
 import tkinter as tk
-import queue # Need queue here
-import time # Keep time for the __main__ block example
+import threading
+import time
 
 class DashboardUI:
-    # ... (no changes inside the class) ...
     def __init__(self, root):
         self.root = root
         self.root.title("BrainTrade Monitor")
@@ -42,52 +41,33 @@ def start_ui(update_queue):
     root = tk.Tk()
     dashboard = DashboardUI(root)
 
-    # Function to check the queue and update UI
-    def check_queue():
-        try:
-            # Process all available updates in the queue
-            while True:
+    def update_loop():
+        while True:
+            try:
                 update_data = update_queue.get_nowait()
                 dashboard.update_state(update_data.get("state", "Unknown"))
                 dashboard.update_expression(update_data.get("expression", "Unknown"))
                 dashboard.update_movement(update_data.get("movement", "Unknown"))
-                # Format HR and Ratio nicely
-                hr_val = update_data.get("hr", "Unknown")
-                ratio_val = update_data.get("ratio", "Unknown")
-                dashboard.update_hr(f"{hr_val:.1f}" if isinstance(hr_val, (int, float)) else hr_val)
-                dashboard.update_ratio(f"{ratio_val:.2f}" if isinstance(ratio_val, (int, float)) else ratio_val)
+                dashboard.update_hr(update_data.get("hr", "Unknown"))
+                dashboard.update_ratio(update_data.get("ratio", "Unknown"))
+            except queue.Empty:
+                pass
+            time.sleep(0.1)  # Adjust as needed
 
-        except queue.Empty:
-            pass # No more updates for now
+    update_thread = threading.Thread(target=update_loop)
+    update_thread.daemon = True
+    update_thread.start()
 
-        # Schedule the next check after 100ms
-        root.after(100, check_queue) # 100ms interval
-
-    # Start the first check
-    check_queue()
-
-    # Start the Tkinter main loop (this will block the main thread)
     root.mainloop()
 
-# Keep the testing block, but it now relies on the main thread's loop
 if __name__ == '__main__':
-    # import queue # Already imported above
-    # import time # Already imported above
-    test_queue = queue.Queue()
-
-    # Function to simulate putting data into the queue
-    def simulate_data_input(q):
-        time.sleep(1)
-        q.put({"state": "Calm", "ratio": 1.5, "hr": 60.5, "expression": "Neutral", "movement": "Low"})
-        time.sleep(2)
-        q.put({"state": "Stress", "ratio": 0.8, "hr": 90.1, "expression": "Angry", "movement": "High"})
-        time.sleep(2)
-        q.put({"state": "Warning", "ratio": 1.0, "hr": 75.9, "expression": "Neutral", "movement": "Medium"})
-
-    # Start the simulation in a separate thread so it doesn't block the UI
-    import threading
-    sim_thread = threading.Thread(target=simulate_data_input, args=(test_queue,), daemon=True)
-    sim_thread.start()
-
-    # Start the UI with the test queue
-    start_ui(test_queue)
+    import queue
+    import time
+    update_queue = queue.Queue()
+    # Example usage:
+    update_queue.put({"state": "Calm", "ratio": 1.5, "hr": 60})
+    time.sleep(1)
+    update_queue.put({"state": "Stress", "ratio": 0.8, "hr": 90})
+    time.sleep(1)
+    update_queue.put({"state": "Warning", "ratio": 1.0, "hr": 75})
+    start_ui(update_queue)
