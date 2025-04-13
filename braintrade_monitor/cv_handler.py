@@ -7,6 +7,10 @@ from fer import FER
 # Shared variable for storing the current expression
 current_expression = "Neutral"
 expression_lock = threading.Lock()
+import collections
+# Expression history
+expression_history = collections.deque(maxlen=5) # Store last 5 expressions
+persistent_expression = "Neutral" # The confirmed expression
 
 def start_cv_processing():
     """Starts the computer vision processing in a separate thread."""
@@ -14,14 +18,14 @@ def start_cv_processing():
     cv_thread.start()
     logging.info("Computer vision processing started in background.")
 
+
 def get_current_expression():
     """Returns the current detected facial expression."""
     with expression_lock:
-        return current_expression
-
+        return persistent_expression
 def _cv_loop():
     """Main loop for computer vision processing."""
-    global current_expression
+    global current_expression, persistent_expression
     logging.info("Starting computer vision loop...")
     video_capture = None  # Initialize to None for proper cleanup
     try:
@@ -47,11 +51,16 @@ def _cv_loop():
                     dominant_emotion = max(emotions, key=emotions.get)
                     with expression_lock:
                         current_expression = dominant_emotion
-                    logging.info(f"Detected expression: {dominant_emotion}")
+                    expression_history.append(dominant_emotion)
+                    if len(expression_history) == expression_history.maxlen and all(x == expression_history[0] for x in expression_history):
+                        with expression_lock:
+                            persistent_expression = expression_history[0]
+                    logging.info(f"Detected expression: {dominant_emotion}, Persistent Expression: {persistent_expression}")
                 else:
                     logging.info("No face detected")
                     with expression_lock:
                         current_expression = "No Face"
+                        persistent_expression = "No Face"
             except Exception as e:
                 logging.error(f"Error processing frame: {e}")
 

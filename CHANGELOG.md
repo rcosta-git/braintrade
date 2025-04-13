@@ -19,8 +19,13 @@
 *   **MNE Filtering Error:** Fixed `ValueError` in `extract_alpha_beta_ratio` related to `picks='all'` argument in `mne.filter.filter_data`.
 *   **Unit Test Errors:** Addressed `NameError` in `tests/test_feature_extraction.py` and `tests/test_baseline.py`, and `AssertionError` and `TypeError` in `tests/test_data_store.py` and `tests/test_processing.py`, resulting in all unit tests now passing.
 
----
 
+*   **ACC Integration:** Successfully integrated accelerometer data for movement detection.
+
+### Known Issues
+*   **Computer Vision Issues:** Encountered dependency and initialization issues with the `FER` library for facial expression detection. Further investigation and troubleshooting are required.
+
+---
 ## [Unreleased] - 2025-04-12 (Late Evening - Phase 1 Completion & Debugging)
 :start_line:4
 :end_line:6
