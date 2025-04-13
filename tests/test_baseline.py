@@ -57,16 +57,20 @@ class TestBaseline(unittest.TestCase):
     def test_calculate_baseline_success(self, mock_estimate_bpm, mock_extract_ratio):
         """Test successful baseline calculation with mocked feature extraction."""
         # Configure mocks to return consistent values
-        mock_extract_ratio.return_value = 1.5 # Example ratio
-        mock_estimate_bpm.return_value = 70.0 # Example HR
+        mock_extract_ratio.return_value = 1.5  # Example ratio
+        mock_estimate_bpm.return_value = 70.0  # Example HR
 
         # Populate enough data (must be >= longest window duration used in check, which is PPG)
-        populate_duration = config.PPG_WINDOW_DURATION + 1 # e.g., 11 seconds
+        populate_duration = 15  # e.g., 15 seconds
         self._populate_data(num_seconds=populate_duration)
+
+        # Populate enough data (must be >= longest window duration used in check, which is PPG)
+        # populate_duration = 15 # e.g., 11 seconds
+        # self._populate_data(num_seconds=populate_duration)
 
         # Run baseline calculation (short duration for test speed)
         # The duration here mainly affects the wait time, data is already populated
-        success = baseline.calculate_baseline(duration_seconds=1) # Wait only 1s
+        success = baseline.calculate_baseline(duration_seconds=15) # Wait only 1s
 
         self.assertTrue(success, "Baseline calculation should succeed")
 

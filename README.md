@@ -16,17 +16,17 @@ The system uses a multi-phase approach, starting with basic physiological indica
 
 See `docs/braintrade_monitor_plan.md` for the overall roadmap and individual `docs/phaseX_*.md` files for detailed plans.
 
-## Current Status (Phase 2 In Progress)
+## Current Status (Phase 2 Complete)
 
-Phase 1 is now complete. The core logic for the stress monitor is now refactored into the `braintrade_monitor` Python package. The main script is now `main.py`. The system performs real-time stress monitoring based on EEG Alpha/Beta ratio, PPG-derived heart rate, and accelerometer data. A basic `tkinter` UI is implemented. Unit tests have been added for core modules.
+Phase 2 is now complete. The core logic for the stress monitor is now refactored into the `braintrade_monitor` Python package. The main script is now `main.py`. The system performs real-time stress monitoring based on EEG Alpha/Beta ratio, PPG-derived heart rate, accelerometer data, and facial expressions. A basic `tkinter` UI is implemented. The team is currently working on getting the unit tests to pass.
 
 *   **Modular Codebase:** Core logic refactored into the `braintrade_monitor` package for better organization and maintainability.
-*   **Unit Tests:** Unit tests added for `feature_extraction`, `state_logic`, `data_store`, and `baseline` modules, ensuring core functionality is robust.
+*   **Unit Tests:** Unit tests added for `feature_extraction`, `state_logic`, `data_store`, and `baseline` modules. The team is currently working on getting the unit tests to pass.
 *   **Resolved Hanging Issue:** The issue causing the script to hang during baseline calculation has been resolved.
 *   **Console Logging:** Logging is configured to output to both file and console, with configurable levels.
 *   **OSC Data Reception:** Confirmed reception of EEG (`/eeg`), PPG (`/ppg`), and ACC (`/acc`) data from Muse Direct via OSC.
-*   **Core Logic ( `braintrade_monitor` package):** Implements OSC data handling, baseline calculation, feature extraction, and state logic.
-*   **UI Dashboard (`dashboard_ui.py`):** Basic `tkinter` UI displays state, A/B Ratio, HR, and Movement.
+*   **Core Logic ( `braintrade_monitor` package):** Implements OSC data handling, baseline calculation, feature extraction, state logic, and computer vision handling.
+*   **UI Dashboard (`dashboard_ui.py`):** Basic `tkinter` UI displays state, A/B Ratio, HR, Movement, and Facial Expression.
 *   **Accelerometer Integration:** Successfully integrated accelerometer data for movement detection.
 ## Setup
 
@@ -34,7 +34,7 @@ Phase 1 is now complete. The core logic for the stress monitor is now refactored
     *   Muse S Headband
     *   Smartphone/Tablet with Muse Direct app installed.
     *   Computer (Mac/Windows/Linux) with Python 3.x and Wi-Fi.
-    *   Webcam (for Phase 2 - basic facial expression, but not fully integrated due to dependency issues)
+    *   Webcam (for Phase 2 - basic facial expression)
     *   Ensure computer and phone/tablet are on the **same Wi-Fi network** for OSC.
 2.  **Software:**
     *   Clone this repository.

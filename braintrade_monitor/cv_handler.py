@@ -12,17 +12,24 @@ import collections
 expression_history = collections.deque(maxlen=5) # Store last 5 expressions
 persistent_expression = "Neutral" # The confirmed expression
 
+
+import threading
+cv_running = False
+cv_started_event = threading.Event()
 def start_cv_processing():
     """Starts the computer vision processing in a separate thread."""
     cv_thread = threading.Thread(target=_cv_loop, daemon=True, name="CVThread")
     cv_thread.start()
     logging.info("Computer vision processing started in background.")
+    cv_running = True
 
+import json
 
 def get_current_expression():
-    """Returns the current detected facial expression."""
+    """Returns the current detected facial expression probabilities."""
     with expression_lock:
-        return persistent_expression
+        return current_expression
+
 def _cv_loop():
     """Main loop for computer vision processing."""
     global current_expression, persistent_expression
@@ -46,15 +53,16 @@ def _cv_loop():
             try:
                 result = detector.detect_emotions(frame)
                 if result:
-                    # Get dominant emotion
+                    # Get emotion probabilities
                     emotions = result[0]['emotions']
-                    dominant_emotion = max(emotions, key=emotions.get)
                     with expression_lock:
-                        current_expression = dominant_emotion
+                        current_expression = emotions
+                    # Find dominant emotion for logging
+                    dominant_emotion = max(emotions, key=emotions.get)
                     expression_history.append(dominant_emotion)
                     if len(expression_history) == expression_history.maxlen and all(x == expression_history[0] for x in expression_history):
                         with expression_lock:
-                            persistent_expression = expression_history[0]
+                            persistent_expression = expression_history[0] # Keep track of persistent expression
                     logging.info(f"Detected expression: {dominant_emotion}, Persistent Expression: {persistent_expression}")
                 else:
                     logging.info("No face detected")

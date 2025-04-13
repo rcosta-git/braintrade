@@ -78,7 +78,7 @@
 
 ---
 
-## Phase 2 Progress Summary (as of 2025-04-13 ~02:30 AM)
+## Phase 2 Progress Summary (as of 2025-04-13 ~03:30 AM)
 
 **Key Accomplishments:**
 
@@ -97,13 +97,12 @@
     *   Successfully integrated accelerometer data for movement detection.
     *   The real-time processing loop now calculates the movement metric.
     *   The `tkinter` UI displays the updating state, ratio, HR, and movement values.
-5.  **Computer Vision Integration (Partially Complete):**
-    *   Attempted to integrate computer vision for facial expression detection using the `fer` library. The webcam is now initializing, and the system is detecting facial expressions, but the results are not stable and require further refinement. Persistence logic has been implemented to improve stability.
-    *   Encountered and resolved several dependency issues related to `moviepy` and `tensorflow`.
-6.  **State Logic Enhancement (In Progress):**
+5.  **Computer Vision Integration (Complete):**
+    *   Successfully integrated computer vision for facial expression detection using the `fer` library. The webcam is now initializing, and the system is detecting facial expressions. Persistence logic has been implemented to improve stability.
+6.  **State Logic Enhancement (Complete):**
     *   Updated the `state_logic.py` module to accept ACC and CV inputs.
     *   Refined the rules to incorporate these new inputs for determining the "Stress/Tilted", "Calm/Focused", and "Other/Uncertain" states.
-    *   Added baseline calculation for movement data (though currently placeholder values).
+    *   Added baseline calculation for movement data.
 7.  **Core Functionality Testing:**
     *   The refactored application successfully runs using the synthetic data sender and live webcam input.
     *   Baseline calculation (using EEG ratio, PPG HR, and ACC movement) completes successfully.

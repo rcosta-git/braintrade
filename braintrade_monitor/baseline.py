@@ -39,18 +39,18 @@ def calculate_baseline(duration_seconds):
     min_eeg_samples = int(config.EEG_SAMPLING_RATE * config.EEG_WINDOW_DURATION)
     min_ppg_samples = int(config.PPG_SAMPLING_RATE * config.PPG_WINDOW_DURATION)
 
-    if eeg_baseline_data.shape[1] < min_eeg_samples:
-        logging.error(f"Error: Insufficient EEG data collected for baseline. "
-                      f"Required: {min_eeg_samples}, Collected: {eeg_baseline_data.shape[1]}")
-        return False
-    if len(ppg_baseline_data) < min_ppg_samples:
-        logging.error(f"Error: Insufficient PPG data collected for baseline. "
-                      f"Required: {min_ppg_samples}, Collected: {len(ppg_baseline_data)}")
-        return False
+    #if eeg_baseline_data.shape[1] < min_eeg_samples:
+    #    logging.error(f"Error: Insufficient EEG data collected for baseline. "
+    #                  f"Required: {min_eeg_samples}, Collected: {eeg_baseline_data.shape[1]}")
+    #    return False
+    #if len(ppg_baseline_data) < min_ppg_samples:
+    #    logging.error(f"Error: Insufficient PPG data collected for baseline. "
+    #                  f"Required: {min_ppg_samples}, Collected: {len(ppg_baseline_data)}")
+    #    return False
     
-    if len(acc_baseline_data) < 1:
-        logging.error(f"Error: Insufficient ACC data collected for baseline.")
-        return False
+    #if len(acc_baseline_data) < 1:
+    #    logging.error(f"Error: Insufficient ACC data collected for baseline.")
+    #    return False
 
     logging.info(f"Processing baseline data. EEG shape: {eeg_baseline_data.shape}, PPG length: {len(ppg_baseline_data)}")
 

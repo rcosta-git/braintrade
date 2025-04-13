@@ -41,17 +41,29 @@ def update_stress_state(current_ratio, current_hr,current_expression, current_mo
         is_ratio_low = current_ratio < ratio_lower_bound if not np.isnan(current_ratio) else False
         is_hr_high = current_hr > hr_upper_bound if not np.isnan(current_hr) else False
         is_movement_high = current_movement > movement_upper_bound  if not np.isnan(current_movement) else False
-        is_expression_negative = current_expression in ["Angry", "Sad", "Fear"]
+        # Calculate weighted expression score
+        expression_weights = {"Angry": 0.8, "Sad": 0.6, "Fear": 0.7, "Happy": -0.1, "Neutral": 0.0, "Surprise": 0.3}
+        weighted_expression_score = 0
+        if isinstance(current_expression, dict):
+            for expression, probability in current_expression.items():
+                weight = expression_weights.get(expression, 0)  # Default to 0 if expression not found
+                weighted_expression_score += probability * weight
+
+        EXPRESSION_STRESS_THRESHOLD = 0.3 # Tune this
+        is_expression_stressed = weighted_expression_score > EXPRESSION_STRESS_THRESHOLD
         is_expression_neutral = current_expression == "Neutral"
         is_physio_calm = not is_ratio_low and not is_hr_high
         is_movement_low = current_movement < movement_upper_bound if not np.isnan(current_movement) else False
 
         # --- Phase 2 Logic ---
-        if (is_ratio_low and is_hr_high) or (is_expression_negative and (is_hr_high or is_movement_high)):
+        # Order: Stress -> Warning -> Calm -> Other
+        if (is_ratio_low and is_hr_high) or (is_expression_stressed and (is_hr_high or is_movement_high)):
             tentative_state = "Stress/Tilted"
-        elif is_physio_calm and is_movement_low and is_expression_neutral:
+        elif is_ratio_low or is_hr_high: # Check for Warning state if not Stress
+             tentative_state = "Warning"
+        elif is_physio_calm and is_movement_low and weighted_expression_score <= 0.0: # Relaxed Calm condition
             tentative_state = "Calm/Focused"
-        else:
+        else: # Default to Other/Uncertain if none of the above match
             tentative_state = "Other/Uncertain"
         # --- End Phase 2 Logic ---
 
@@ -91,18 +103,18 @@ if __name__ == '__main__':
 
     # Simulate updates
     inputs = [
-        (1.6, 66, "Neutral", 0.5), # Calm
-        (1.7, 64, "Neutral", 0.6), # Calm
-        (1.55, 67, "Neutral", 0.4), # Calm
-        (1.0, 80, "Angry", 1.5), # Stress
-        (0.9, 82, "Angry", 1.6), # Stress
-        (1.1, 78, "Angry", 1.4), # Stress -> Should trigger change
-        (1.2, 75, "Warning", 1.2), # Warning
-        (1.6, 65, "Neutral", 0.5), # Calm
-        (1.7, 63, "Neutral", 0.6), # Calm
-        (1.5, 66, "Neutral", 0.4), # Calm
-        (1.6, 64, "Neutral", 0.5), # Calm
-        (1.55, 65, "Neutral", 0.6), # Calm -> Should trigger change
+        (1.6, 66, {"Neutral": 0.8, "Happy": 0.2}, 0.5), # Calm
+        (1.7, 64, {"Neutral": 0.9, "Happy": 0.1}, 0.6), # Calm
+        (1.55, 67, {"Neutral": 0.7, "Happy": 0.3}, 0.4), # Calm
+        (1.0, 80, {"Angry": 0.6, "Fear": 0.4}, 1.5), # Stress
+        (0.9, 82, {"Angry": 0.7, "Fear": 0.3}, 1.6), # Stress
+        (1.1, 78, {"Angry": 0.5, "Fear": 0.5}, 1.4), # Stress -> Should trigger change
+        (1.2, 75, {"Surprise": 0.6, "Neutral": 0.4}, 1.2), # Warning
+        (1.6, 65, {"Neutral": 0.8, "Happy": 0.2}, 0.5), # Calm
+        (1.7, 63, {"Neutral": 0.9, "Happy": 0.1}, 0.6), # Calm
+        (1.5, 66, {"Neutral": 0.7, "Happy": 0.3}, 0.4), # Calm
+        (1.6, 64, {"Neutral": 0.8, "Happy": 0.2}, 0.5), # Calm
+        (1.55, 65, {"Neutral": 0.9, "Happy": 0.1}, 0.6), # Calm -> Should trigger change
     ]
 
     for ratio, hr, expression, movement in inputs:
