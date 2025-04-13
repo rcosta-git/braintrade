@@ -15,16 +15,19 @@ def handle_eeg(address, *args):
     # logging.debug(f"OSC Handler: Received /eeg message with {len(args)} args.") # DEBUG LOG - Commented out for less verbosity
     # No need for global or lock here, data_store handles it
     # logging.debug(f"Received EEG: {args}") # Optional debug
+    logging.debug(f"handle_eeg: Received {len(args)} values. Attempting to add to data_store.")
     data_store.add_eeg_data(args)
 
 def handle_ppg(address, *args):
     """Handles incoming /ppg OSC messages."""
     # logging.debug(f"Received PPG: {args}") # Optional debug
+    logging.debug(f"handle_ppg: Received {len(args)} values. Attempting to add to data_store.")
     data_store.add_ppg_data(args)
 
 def handle_acc(address, *args):
     """Handles incoming /acc OSC messages."""
     # logging.debug(f"Received ACC: {args}") # Optional debug
+    logging.debug(f"handle_acc: Received {len(args)} values. Attempting to add to data_store.")
     data_store.add_acc_data(args)
 
 def handle_default(address, *args):

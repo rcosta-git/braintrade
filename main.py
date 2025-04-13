@@ -4,6 +4,9 @@ import threading
 import time
 import logging
 import sys
+import uvicorn # For running the API server
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import modules from the package
 from braintrade_monitor import (
@@ -15,8 +18,11 @@ from braintrade_monitor import (
     processing,
     cv_handler
 )
-# Import the UI module (assuming it's at the top level for now)
-import dashboard_ui
+# Import the API endpoint function
+from web_server import get_state as api_get_state
+
+# REMOVED old UI import
+# import dashboard_ui
 
 def main():
     # 1. Setup Logging
@@ -52,8 +58,21 @@ def main():
         num_eeg_channels=config.NUM_EEG_CHANNELS
     )
 
-    # 4. Initialize UI Queue
-    update_queue = queue.Queue(maxsize=100) # Add maxsize to prevent unbounded growth
+    # 4. Initialize Shared State for Web Server
+    shared_state = {
+        "timestamp": None,
+        "system_phase": "Initializing", # Add system phase
+        "overall_state": "Initializing",
+        "alpha_beta_ratio": None,
+        "heart_rate": None,
+        "expression_dict": None,
+        "movement_metric": None,
+        "theta_power": None,
+    }
+    shared_state_lock = threading.Lock()
+
+    # Initialize old UI Queue (might still be used by processing loop temporarily)
+    update_queue = queue.Queue(maxsize=100)
 
     # 5. Start OSC Server Thread
     logging.info(f"Starting OSC server on {args.osc_ip}:{args.osc_port}...")
@@ -62,13 +81,28 @@ def main():
         logging.error("Failed to start OSC server. Exiting.")
         sys.exit(1) # Exit if server fails
 
+    # Give OSC server a moment to start receiving data
+    logging.info("Waiting briefly for OSC data to start arriving...")
+    time.sleep(1.0) # Add a 1-second delay
+
     # 6. Calculate Baseline
-    logging.info("Starting baseline calculation with ACC...")
+    logging.info("Starting baseline calculation...")
+    # Update shared state before baseline
+    with shared_state_lock:
+        shared_state["system_phase"] = "Calculating Baseline"
+        shared_state["timestamp"] = time.time()
+
     if not baseline.calculate_baseline(args.baseline_duration):
         logging.error("Baseline calculation failed. Exiting.")
-        osc_server_instance.shutdown() # Attempt clean shutdown
+        if osc_server_instance:
+             osc_server_instance.shutdown() # Attempt clean shutdown
         sys.exit(1) # Exit if baseline fails
-    logging.info("Baseline calculation successful.")
+
+    # Update shared state after baseline
+    with shared_state_lock:
+        shared_state["system_phase"] = "Monitoring"
+        shared_state["timestamp"] = time.time()
+    logging.info("Baseline calculation successful. Starting monitoring.")
 
     # 7. Start Computer Vision Thread
     logging.info("Starting computer vision processing...")
@@ -79,51 +113,83 @@ def main():
     stop_processing_event = threading.Event()
     processing_thread = threading.Thread(
         target=processing.processing_loop,
-        args=(update_queue, stop_processing_event), # Pass stop event
+        args=(
+            update_queue,
+            stop_processing_event,
+            shared_state, # Pass shared state dict
+            shared_state_lock # Pass shared state lock
+        ),
         daemon=True, # Daemon thread exits if main thread exits
         name="ProcessingThread"
     )
     processing_thread.start()
 
-    # 8. Start UI on the Main Thread (this blocks until UI window is closed)
-    logging.info("Starting UI on main thread...")
-    ui_crashed = False
+    # 8. Setup FastAPI App and API Endpoint
+    logging.info("Setting up FastAPI app...")
+    app = FastAPI()
+
+    # Configure CORS
+    origins = [
+        "http://localhost:5173", # Default Vite port
+        "http://127.0.0.1:5173",
+    ]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Define the endpoint, injecting shared state and lock
+    @app.get("/api/state")
+    async def main_get_state():
+        # This wrapper calls the imported function, passing the state/lock from main's scope
+        return await api_get_state(shared_state, shared_state_lock)
+
+    # 9. Start API Server Thread
+    logging.info("Starting API server thread...")
+    api_server_thread = threading.Thread(
+        target=uvicorn.run,
+        kwargs={'app': app, 'host': '0.0.0.0', 'port': 8000, 'log_level': 'info'},
+        daemon=True, # Daemon thread exits if main thread exits
+        name="APIServerThread"
+    )
+    api_server_thread.start()
+
+    # 10. Keep Main Thread Alive & Handle Shutdown
+    logging.info("Application started. Press Ctrl+C to stop.")
     try:
-        # Pass the queue to the UI starter function
-        dashboard_ui.start_ui(update_queue)
-        # If start_ui returns normally, it means the UI window was closed by the user
-        logging.info("UI window closed by user.")
-    except Exception as e:
-        logging.exception(f"UI encountered an error: {e}")
-        ui_crashed = True
+        while True:
+            # Keep main thread alive, threads are doing the work
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logging.info("Ctrl+C detected. Initiating shutdown sequence...")
     finally:
         # --- Cleanup ---
-        logging.info("Initiating shutdown sequence...")
-
-        # Signal the processing thread to stop
         logging.info("Signaling processing thread to stop...")
         stop_processing_event.set()
 
         # Shutdown OSC server
         logging.info("Shutting down OSC server...")
         if osc_server_instance:
-            osc_server_instance.shutdown() # Request shutdown
-            # Wait briefly for the OSC server thread to exit
+            osc_server_instance.shutdown()
             if osc_thread and osc_thread.is_alive():
                  osc_thread.join(timeout=2.0)
                  if osc_thread.is_alive():
                       logging.warning("OSC server thread did not exit cleanly.")
 
-        # Wait briefly for the processing thread to exit
+        # Wait for processing thread
         logging.info("Waiting for processing thread to stop...")
         if processing_thread and processing_thread.is_alive():
-             processing_thread.join(timeout=2.0) # Wait max 2 seconds
+             processing_thread.join(timeout=2.0)
              if processing_thread.is_alive():
                   logging.warning("Processing thread did not exit cleanly.")
 
+        # API server thread is daemon, should exit automatically, but good practice might involve more graceful shutdown if needed
+
         logging.info("BrainTrade Monitor shutdown complete.")
-        # Exit with error code if UI crashed
-        sys.exit(1 if ui_crashed else 0)
+        sys.exit(0)
 
 
 if __name__ == "__main__":

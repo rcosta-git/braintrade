@@ -23,6 +23,7 @@ def update_stress_state(current_ratio, current_hr, current_expression, current_m
     Returns:
         str: The potentially updated current_state after applying persistence.
     """
+    logging.debug(f"update_stress_state: ratio={current_ratio}, hr={current_hr}, theta={current_theta}, movement={current_movement}, expression={current_expression}, baseline={baseline_metrics}")
     new_state = current_state # Default to current state unless persistence logic changes it
 
     # 1. Determine Tentative State
@@ -57,6 +58,7 @@ def update_stress_state(current_ratio, current_hr, current_expression, current_m
         theta_upper_bound = baseline_metrics['theta_median'] + config.THETA_THRESHOLD * baseline_metrics['theta_std']
         is_theta_high = current_theta > theta_upper_bound if not np.isnan(current_theta) else False
 
+        logging.debug(f"update_stress_state: is_ratio_low={is_ratio_low}, is_hr_high={is_hr_high}, is_movement_high={is_movement_high}, is_theta_high={is_theta_high}, expression={current_expression}")
         # --- Phase 3 Logic ---
         # Order: Drowsy/Distracted -> Stress -> Warning -> Calm -> Other
         if is_theta_high and is_movement_low:

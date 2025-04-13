@@ -8,3 +8,5 @@ opencv-python
 fer
 moviepy
 tensorflow>=1.24.0
+fastapi
+uvicorn[standard]

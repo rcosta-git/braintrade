@@ -47,6 +47,8 @@ def add_eeg_data(eeg_sample):
                 for i in range(_num_eeg_channels):
                     _eeg_data_buffers[i].append((ts, float(eeg_sample[i])))
                 _last_eeg_timestamp = ts
+                # Log after successful addition inside try block
+                logging.debug(f"add_eeg_data: Added sample. Buffer sizes: {[len(b) for b in _eeg_data_buffers]}")
             except (ValueError, TypeError, IndexError) as e:
                  logging.error(f"Error processing EEG sample in data_store: {e} - Sample: {eeg_sample}")
         elif _eeg_data_buffers is None:
@@ -65,6 +67,8 @@ def add_ppg_data(ppg_sample):
                  ppg_value = float(ppg_sample[1]) # Extract the middle PPG value
                  _ppg_data_buffer.append((ts, ppg_value))
                  _last_ppg_timestamp = ts
+                 # Log after successful addition inside try block
+                 logging.debug(f"add_ppg_data: Added sample. Buffer size: {len(_ppg_data_buffer)}")
              except (ValueError, TypeError, IndexError) as e:
                  logging.error(f"Error processing PPG sample in data_store: {e} - Sample: {ppg_sample}")
         elif _ppg_data_buffer is None:
@@ -83,6 +87,8 @@ def add_acc_data(acc_sample):
                 acc_tuple = tuple(map(float, acc_sample))
                 _acc_data_buffer.append((ts, acc_tuple))
                 _last_acc_timestamp = ts
+                # Log after successful addition inside try block
+                logging.debug(f"add_acc_data: Added sample. Buffer size: {len(_acc_data_buffer)}")
             except (ValueError, TypeError) as e:
                 logging.error(f"Error processing ACC sample in data_store: {e} - Sample: {acc_sample}")
         elif _acc_data_buffer is None:
@@ -132,9 +138,8 @@ def get_data_for_processing(eeg_window_duration, ppg_window_duration, acc_window
              recent_acc_data = None
 
         # Copy baseline metrics
-        current_baseline_metrics = _baseline_metrics.copy()
+        # Baseline metrics are no longer copied/returned here
         logging.debug(f"get_data_for_processing: EEG bufs exist={_eeg_data_buffers is not None}, PPG buf exists={_ppg_data_buffer is not None}, ACC buf exists={_acc_data_buffer is not None}")
-        logging.debug(f"get_data_for_processing: Baseline metrics copied: {current_baseline_metrics}")
 
     # Log lengths before returning
     logging.debug(f"get_data_for_processing: Returning EEG len={len(recent_eeg_data[0]) if recent_eeg_data else 'None'}, PPG len={len(recent_ppg_data) if recent_ppg_data else 'None'}, ACC len={len(recent_acc_data) if recent_acc_data else 'None'}")
@@ -142,8 +147,9 @@ def get_data_for_processing(eeg_window_duration, ppg_window_duration, acc_window
     # Return copies of data and timestamps
     return (time_since_last_eeg, time_since_last_ppg, time_since_last_acc,
             recent_eeg_data, recent_ppg_data, recent_acc_data, # Note: recent_eeg_data is list of lists here
-            current_baseline_metrics)
-    logging.debug("get_data_for_processing: Lock released.")
+            ) # Removed baseline metrics from return tuple
+    # This line was unreachable due to return statement above, removed:
+    # logging.debug("get_data_for_processing: Lock released.")
 
 def get_all_data_for_baseline():
     """Retrieves all currently buffered data (values only) for baseline calculation."""

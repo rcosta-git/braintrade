@@ -10,15 +10,23 @@ from . import data_store
 from . import feature_extraction
 from . import state_logic
 from . import cv_handler
+# Removed import from web_server
 
-def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
+def processing_loop(
+    update_queue: queue.Queue,
+    stop_event: threading.Event,
+    shared_state_dict: dict, # Added shared state dict argument
+    shared_state_lock_obj: threading.Lock # Added shared state lock argument
+):
     """
     Main loop for processing sensor data, calculating features, updating state,
-    and sending results to the UI queue. Designed to run in a background thread.
+    and sending results to the UI queue and shared state dict. Designed to run in a background thread.
 
     Args:
-        update_queue (queue.Queue): Queue to send display data to the UI.
+        update_queue (queue.Queue): Queue to send display data to the (old) UI.
         stop_event (threading.Event): Event to signal the loop to stop.
+        shared_state_dict (dict): Dictionary for sharing state with the web server.
+        shared_state_lock_obj (threading.Lock): Lock for accessing the shared state dict.
     """
     logging.info("Starting real-time processing loop...")
 
@@ -26,6 +34,13 @@ def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
     current_official_state = "Initializing"
     # Deque for storing recent tentative states for persistence logic
     tentative_state_history = collections.deque(maxlen=config.STATE_PERSISTENCE_UPDATES)
+
+    # Get baseline metrics once before starting the loop
+    final_baseline_metrics = data_store.get_baseline_metrics()
+    if not final_baseline_metrics:
+        logging.error("Processing loop: Failed to retrieve baseline metrics before starting. Exiting.")
+        return # Exit if baseline is missing
+    logging.info(f"Processing loop: Using baseline metrics: {final_baseline_metrics}")
 
     try: # Outer try block to catch early exceptions
         while not stop_event.is_set():
@@ -35,9 +50,10 @@ def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
 
             try: # Inner try block for main processing logic
                 # 1. Get recent data and baseline metrics from data_store
+                # 1. Get recent data from data_store (baseline already fetched)
                 (time_since_last_eeg, time_since_last_ppg, time_since_last_acc,
-                 recent_eeg_data, recent_ppg_data, recent_acc_data,
-                 current_baseline_metrics) = data_store.get_data_for_processing(
+                 recent_eeg_data, recent_ppg_data, recent_acc_data
+                 ) = data_store.get_data_for_processing( # Removed baseline retrieval from here
                      config.EEG_WINDOW_DURATION, config.PPG_WINDOW_DURATION, 3.0 # Placeholder ACC window
                  )
                 logging.debug("Processing loop: Data retrieved from store.")
@@ -51,7 +67,19 @@ def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
                          current_official_state = "Uncertain (Stale Data)"
                          # Clear history when becoming uncertain due to stale data
                          tentative_state_history.clear()
-                    # Send stale state to UI
+
+                    # Update shared state for web server
+                    with shared_state_lock_obj: # Use passed lock object
+                        shared_state_dict["timestamp"] = time.time()
+                        shared_state_dict["overall_state"] = current_official_state
+                        shared_state_dict["alpha_beta_ratio"] = None
+                        shared_state_dict["heart_rate"] = None
+                        shared_state_dict["expression_dict"] = None
+                        shared_state_dict["movement_metric"] = None
+                        shared_state_dict["theta_power"] = None
+                        logging.debug("Shared state updated with STALE status.")
+
+                    # Send stale state to UI (existing Tkinter queue)
                     update_data = {"state": current_official_state, "ratio": np.nan, "hr": np.nan, "expression": "N/A", "movement": "N/A"}
                     logging.debug("Processing loop: Stale data check complete (Data was stale).")
 
@@ -93,18 +121,20 @@ def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
                     # --- Debugging State Logic Inputs ---
                     # Log features first, before checking baseline
                     logging.debug(f"Features: ratio={current_ratio}, hr={current_hr}, theta={current_theta}, movement={current_movement}, expression={current_expression}")
-                    if current_baseline_metrics:
-                        logging.debug(f"***ROO-DEBUG-CHECK*** Baseline Metrics: {current_baseline_metrics}")
+                    # Use the baseline fetched before the loop
+                    if final_baseline_metrics:
+                        logging.debug(f"***ROO-DEBUG-CHECK*** Baseline Metrics: {final_baseline_metrics}")
 
                         # Safely get baseline values, defaulting to NaN
-                        ratio_median = current_baseline_metrics.get('ratio_median', np.nan)
-                        ratio_std = current_baseline_metrics.get('ratio_std', np.nan)
-                        hr_median = current_baseline_metrics.get('hr_median', np.nan)
-                        hr_std = current_baseline_metrics.get('hr_std', np.nan)
-                        movement_median = current_baseline_metrics.get('movement_median', np.nan)
-                        movement_std = current_baseline_metrics.get('movement_std', np.nan)
-                        theta_median = current_baseline_metrics.get('theta_median', np.nan)
-                        theta_std = current_baseline_metrics.get('theta_std', np.nan)
+                        # Safely get baseline values from the pre-fetched dictionary
+                        ratio_median = final_baseline_metrics.get('ratio_median', np.nan)
+                        ratio_std = final_baseline_metrics.get('ratio_std', np.nan)
+                        hr_median = final_baseline_metrics.get('hr_median', np.nan)
+                        hr_std = final_baseline_metrics.get('hr_std', np.nan)
+                        movement_median = final_baseline_metrics.get('movement_median', np.nan)
+                        movement_std = final_baseline_metrics.get('movement_std', np.nan)
+                        theta_median = final_baseline_metrics.get('theta_median', np.nan)
+                        theta_std = final_baseline_metrics.get('theta_std', np.nan)
 
                         # Calculate bounds only if baseline values are valid
                         ratio_lower_bound = ratio_median - config.RATIO_THRESHOLD * ratio_std if not np.isnan(ratio_median) and not np.isnan(ratio_std) else np.nan
@@ -125,10 +155,23 @@ def processing_loop(update_queue: queue.Queue, stop_event: threading.Event):
 
                     # 5. Update stress state using persistence logic
                     current_official_state = state_logic.update_stress_state(current_ratio, current_hr, current_expression, current_movement, current_theta,
-                        current_baseline_metrics, current_official_state, tentative_state_history)
+                        final_baseline_metrics, current_official_state, tentative_state_history)
                     logging.debug(f"Processing loop: State updated: {current_official_state}")
 
-                    # Prepare data for UI
+                    # --- Update Shared State for Web Server ---
+                    current_time = time.time() # Use a consistent timestamp
+                    with shared_state_lock_obj: # Use passed lock object
+                        shared_state_dict["timestamp"] = current_time
+                        shared_state_dict["overall_state"] = current_official_state
+                        shared_state_dict["alpha_beta_ratio"] = current_ratio if not np.isnan(current_ratio) else None
+                        shared_state_dict["heart_rate"] = current_hr if not np.isnan(current_hr) else None
+                        shared_state_dict["expression_dict"] = current_expression if current_expression != "N/A" else None
+                        shared_state_dict["movement_metric"] = current_movement if not np.isnan(current_movement) else None
+                        shared_state_dict["theta_power"] = current_theta if not np.isnan(current_theta) else None
+                        logging.debug("Shared state updated with latest data.")
+                    # --- End Update Shared State ---
+
+                    # Prepare data for UI (existing Tkinter queue)
                     update_data = {
                         "state": current_official_state,
                         "ratio": current_ratio,
