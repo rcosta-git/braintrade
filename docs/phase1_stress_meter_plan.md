@@ -2,6 +2,13 @@
 
 **Part of Project:** BrainTrade - Mental State Monitor
 
+**Current Status (As of 2025-04-12 Evening):**
+*   Basic script structure (`stress_monitor.py`) created.
+*   OSC listener implemented and confirmed receiving `/eeg` and `/ppg` data.
+*   Baseline calculation function structure implemented.
+*   Feature extraction functions (`extract_alpha_beta_ratio`, `estimate_bpm_from_ppg`) added.
+*   **Next Steps:** Fix `RuntimeWarning` in EEG filtering, implement main processing loop logic, implement state logic, implement console UI.
+
 **Objective:** Create a real-time indicator of potential stress/tilt based on EEG Alpha/Beta ratio and Heart Rate changes relative to a baseline, estimating HR from PPG data.
 
 **Core Script:** `stress_monitor.py`
@@ -16,8 +23,8 @@
     *   **Duration:** 60 seconds (tunable parameter).
     *   **Data Collection:** In a loop (e.g., every 0.5s update interval):
         *   Get latest data windows (e.g., 2s EEG, 5-10s PPG). Ensure enough data is buffered before starting calculations.
-        *   Calculate Alpha/Beta ratio for the EEG window (using `get_band_powers`).
-        *   Estimate BPM for the PPG window (using `get_heart_rate`).
+        *   Calculate Alpha/Beta ratio for the EEG window (using `extract_alpha_beta_ratio`).
+        *   Estimate BPM for the PPG window (using `estimate_bpm_from_ppg`).
         *   Store valid calculated ratio and BPM values in temporary lists for the baseline period.
     *   **Calculation (End of Baseline Period):**
         *   Calculate `baseline_ratio_median` (median of collected ratios).
@@ -28,14 +35,14 @@
     *   **Storage:** Store these four baseline metrics (`baseline_ratio_median`, `baseline_ratio_std`, `baseline_hr_median`, `baseline_hr_std`).
 
 **3. Real-time Feature Extraction Functions:**
-    *   **`get_band_powers(eeg_window, sampling_rate)`:**
+    *   **`extract_alpha_beta_ratio(eeg_data, sampling_rate)`:**
         *   Input: NumPy array `(n_channels, n_samples)`.
-        *   Apply bandpass filter (e.g., 1-40 Hz using `mne.filter.filter_data`).
+        *   Apply bandpass filter (e.g., 1-40 Hz using `mne.filter.filter_data`). **Needs fix for `RuntimeWarning` - specify lower filter order.**
         *   Calculate PSD using `mne.time_frequency.psd_array_welch`.
             *   Dynamically set `n_fft = min(n_samples, 256)` and pass `n_per_seg=n_fft`.
         *   Calculate average power in Alpha (8-13 Hz) and Beta (13-30 Hz) bands.
         *   Compute ratio (e.g., Alpha/Beta). Return the ratio (or handle division by zero, e.g., return NaN or a default value).
-    *   **`get_heart_rate(ppg_window, sampling_rate)`:**
+    *   **`estimate_bpm_from_ppg(ppg_window, sampling_rate)`:**
         *   Input: NumPy array `(n_samples,)`. Assume `sampling_rate` is known (e.g., 64 Hz for Muse PPG).
         *   Apply bandpass filter (e.g., 0.5-4 Hz using `scipy.signal.butter` + `filtfilt`).
         *   Detect peaks using `scipy.signal.find_peaks` (tune `height`, `distance` parameters based on filtered signal characteristics and expected HR range).
@@ -46,8 +53,8 @@
     *   Runs after baseline calculation.
     *   Sleeps for `update_interval` (e.g., 0.5s).
     *   Acquire lock, get latest data windows from deques (e.g., 2s EEG, 5-10s PPG). Release lock. Check if enough data is available.
-    *   Call `get_band_powers` to get `current_ratio`.
-    *   Call `get_heart_rate` to get `current_hr`.
+    *   Call `extract_alpha_beta_ratio` to get `current_ratio`.
+    *   Call `estimate_bpm_from_ppg` to get `current_hr`.
     *   Handle cases where feature calculation returns NaN (e.g., skip state update).
     *   Apply State Logic (see below).
     *   Call UI update function.
@@ -68,6 +75,7 @@
             *   If deque is full AND all elements in deque are identical AND the identical state is different from `current_state`:
                 *   Update `current_state` to the new persistent state.
     *   **Output:** The persistent `current_state`.
+
 **6. UI/Feedback (MVP):**
     *   Print current state, ratio, and HR to console periodically.
 

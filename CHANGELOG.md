@@ -1,11 +1,57 @@
 # Changelog
 
-## [Unreleased] - 2025-04-12
+## [Unreleased] - 2025-04-12 (Late Evening - Phase 1 Completion & Debugging)
+
+### Added
+*   **Debug Logging:** Added print statements and logging in `main()` and `calculate_baseline()` functions in `stress_monitor.py` to diagnose hanging issue.
+
+### Changed
+*   **Disabled File Logging:** Modified logging configuration in `stress_monitor.py` to only output to console, disabling file logging to address disk space issues.
+*   **Simplified Baseline Loop (Initially):** Temporarily removed `time.sleep()` from the baseline data collection loop in `stress_monitor.py` for debugging (later re-enabled).
+*   **Updated README.md:** Updated "Current Status" section to reflect Phase 1 completion, resolved hanging issue, and console logging.
+
+### Fixed
+*   **Resolved Hanging Issue:** Diagnosed and resolved the issue causing `stress_monitor.py` to hang during baseline calculation. The script now runs through baseline and enters real-time monitoring loop.
+
+---
+
+## [Unreleased] - 2025-04-12 (Evening - Hackathon Pivot)
+
+### Added
+*   **Project Pivot:** Shifted focus from Motor Imagery BCI to "BrainTrade - Mental State Monitor".
+*   **New Goal:** Monitor trader's mental state (stress, focus, fatigue) using Muse EEG/PPG/ACC and potentially CV to provide feedback.
+*   **Project Plans:**
+    *   Created overall roadmap: `docs/braintrade_monitor_plan.md`.
+    *   Created detailed phase plans:
+        *   `docs/phase1_stress_meter_plan.md`
+        *   `docs/phase2_dashboard_plan.md`
+        *   `docs/phase3_focus_guardian_plan.md`
+        *   `docs/phase4_advanced_indicators_plan.md` (Stretch Goal)
+        *   `docs/phase5_web_ui_plan.md` (Future Enhancement)
+*   **Core Script:** Created `stress_monitor.py` for real-time monitoring.
+*   **PPG Prototype:** Created `test_ppg_bpm.py` to prototype BPM estimation from PPG.
+*   **OSC Handling:** Implemented OSC listeners for `/eeg` and `/ppg` in `stress_monitor.py`. Confirmed data reception.
+*   **Baseline Logic:** Implemented baseline calculation structure (median/std dev) in `stress_monitor.py`.
+*   **Feature Extraction:** Added `extract_alpha_beta_ratio` and `estimate_bpm_from_ppg` functions to `stress_monitor.py`.
+
+### Changed
+*   **Archived Old Files:** Moved previous motor imagery scripts (`motor_imagery_trainer.py`, `motor_imagery_classifier.py`, `combined_trainer.py`, `data_collector.py`) and related plans/logs to the `old/` directory.
+*   Updated `README.md` to reflect the new project focus and status.
+
+### Fixed
+*   Addressed `RuntimeWarning` in `extract_alpha_beta_ratio` by specifying IIR filter parameters (though this change was interrupted and needs re-verification/fixing).
+
+---
+
+## [Previous] - 2025-04-12 (Afternoon - Motor Imagery)
 
 ### Added
 *   `check_osc.py` script for verifying OSC stream reception.
 *   Plan document for real-time classifier (`docs/motor_imagery_classifier_plan.md`), including CSP option.
 *   README.md and CHANGELOG.md files.
+*   Multi-session training workflow (`data_collector.py`, `combined_trainer.py`) and documentation updates.
+*   Markdown logging to trainer scripts.
+*   SVM classifier option to `combined_trainer.py`.
 
 ### Changed
 *   Refactored `motor_imagery_trainer.py` to use OSC/Muse Direct for data acquisition instead of BrainFlow direct connection.
@@ -17,9 +63,14 @@
     *   Updated saved model artifacts structure.
 *   Updated `docs/motor_imagery_mne_plan.md` and `docs/motor_imagery_detailed_plan_v3.md` to reflect OSC changes.
 *   Added `python-osc` to `requirements.txt`.
+*   Modified `combined_trainer.py` to handle epoch length differences via cropping.
 
 ### Fixed
 *   Resolved issues preventing OSC data collection in `motor_imagery_trainer.py` (scope issue with global flag, OSC argument count mismatch).
 *   Fixed `NameError` for `event_id` in `motor_imagery_trainer.py`.
 *   Corrected `try...except...finally` block structure in `motor_imagery_trainer.py`.
 *   Adjusted `train_test_split` logic in `motor_imagery_trainer.py` to handle small sample sizes during testing better.
+*   Fixed various `AttributeError` and `NameError` issues in `combined_trainer.py` related to missing arguments and variables during artifact saving.
+*   Fixed `ValueError` in `combined_trainer.py` during epoch concatenation due to mismatched time points by adding cropping logic.
+*   Fixed `ValueError` in `extract_band_power_features` (in trainer scripts) when encountering short epochs by dynamically adjusting `n_fft`.
+*   Fixed `NameError` for `csp_plot_filename` during logging in `combined_trainer.py`.
